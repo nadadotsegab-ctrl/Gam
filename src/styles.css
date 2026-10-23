@@ -18,3 +18,51 @@
 @media(max-width:650px){.daily-page-label{font-size:8px;padding:7px 10px}.props-intro{padding:24px 21px;gap:15px;flex-direction:column;margin-bottom:17px}.props-intro h2{font-size:29px;margin-top:15px}.props-intro p{font-size:9px}.props-intro-right{align-self:stretch;flex-direction:row;align-items:center;gap:9px;border-top:1px solid #63815b40;padding-top:17px;margin-top:3px;flex-wrap:wrap}.props-sport-stack{margin-right:5px;margin-left:5px}.props-sport-stack>span{width:30px;height:30px;font-size:7px}.props-sport-stack>span:nth-child(3){font-size:13px}.props-intro-right>strong{font-size:12px;margin-top:0}.props-intro-right>span:not(.props-sport-stack){font-size:8px;margin-left:auto}.props-intro-right>small{flex-basis:100%;max-width:none;text-align:left;font-size:7px;margin:0}.props-status-bar{gap:6px;font-size:8px;margin:17px 0}.props-status-bar>span:not(.props-status-dot){order:3;flex-basis:100%;margin-left:12px;font-size:8px;line-height:1.7}.props-status-bar>.text-button{margin-left:auto;font-size:8px}.props-controls.panel{padding:17px;margin-bottom:17px}.props-scan-filters{gap:14px 11px}.props-scan-filters>.field{font-size:9px}.props-scan-filters select{padding:10px 8px;font-size:10px}.props-refresh-row{margin-top:17px;padding-top:13px;gap:10px}.auto-refresh{font-size:8px}.props-refresh-row>span{font-size:7px}.props-connect-card{padding:25px 21px;gap:17px;flex-direction:column}.connect-icon{height:46px;width:46px;border-radius:9px}.connect-icon>svg{width:23px}.props-connect-card h2{font-size:22px;line-height:1.35}.props-connect-card p{font-size:10px;line-height:1.9}.props-connect-card ol{font-size:10px;padding-left:15px}.props-connect-card li{margin-bottom:12px}.props-connect-card code{font-size:9px}.props-connect-actions{gap:8px;flex-wrap:wrap}.props-connect-actions .button{font-size:9px;padding:9px 11px}.props-connect-card .connect-note{font-size:8px}.props-connect-card .eyebrow{font-size:7px}.props-stats{margin-bottom:17px}.props-stats .stat-label{font-size:8px}.props-stats .stat-foot{font-size:7px}.props-stats .stat-value{font-size:25px}.props-stats .stat-value>small{font-size:13px}.props-stats .props-time-value{font-size:20px;padding-top:2px;padding-bottom:3px}.props-result-filters{padding:0 15px 17px;gap:12px 9px;grid-template-columns:1fr 1fr 1fr}.compact-select{font-size:7px;gap:5px}.compact-select select{font-size:8px;padding:8px 5px}.prop-grid{grid-template-columns:1fr;padding:0 15px 17px;gap:13px}.prop-card{padding:22px 19px}.prop-card h3{font-size:23px}.prop-card .edge-pill{font-size:10px}.prop-sport{font-size:9px}.prop-selection strong{font-size:16px}.prop-selection>span{font-size:11px}.prop-event{font-size:10px}.prop-schedule{font-size:9px}.prop-reference{font-size:9px}.prop-price-row{padding:13px 12px}.prop-book{font-size:10px}.prop-price-row>strong{font-size:22px}.prop-card .button{font-size:10px;min-height:35px}.props-market-panel .market-panel-heading{align-items:flex-start}.props-market-panel .market-panel-heading h2{font-size:12px}.props-market-panel .market-panel-heading p{font-size:8px}.props-market-panel .market-panel-heading .button{font-size:8px;gap:5px;padding:6px}.props-method-row{gap:7px;margin-top:15px;font-size:7px}.props-method-row>.text-button{font-size:8px;margin-left:22px}.props-loading{padding:42px 19px}.props-loading h3{font-size:15px}.props-loading p{font-size:10px}.props-scan-warning{padding:13px;gap:8px}.props-scan-warning strong{font-size:10px}.props-scan-warning p{font-size:9px}.prop-details>h3{font-size:26px}.prop-details .pick-metrics{margin-left:-21px;margin-right:-21px;padding-left:21px;padding-right:21px}.props-setup>h3,.props-method>h3{font-size:20px}.props-setup li,.props-method li{font-size:10px}}
 
 .sidebar{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#344b40 transparent}.sidebar>.brand,.sidebar>.workspace-label,.sidebar>nav,.sidebar>.nav-section-label,.sidebar>.sidebar-bottom{flex-shrink:0}
+
+
+/* Live player lookup and parlay research — extends UltraX's original design. */
+.research-shell{display:grid;gap:18px;padding-bottom:28px}
+.research-hero{min-height:178px;padding:32px 35px;border-radius:10px;background:linear-gradient(105deg,#142c2f,#1b3c32);color:#edf5ec;display:flex;justify-content:space-between;gap:20px;align-items:center}
+.research-hero .eyebrow{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:#c3e6a8;margin-bottom:15px}
+.research-hero h2{font-size:29px;line-height:1.18;letter-spacing:-.8px;font-weight:590}
+.research-hero h2 span{color:#c7ebaa}
+.research-hero p{font-size:12px;line-height:1.7;color:#bed0c5;max-width:620px;margin-top:13px}
+.research-hero>svg{color:#c3e6a8}
+.research-panel{background:white;border:1px solid var(--border);border-radius:9px;padding:24px;display:grid;gap:17px}
+.research-panel-heading h2{font-size:18px;color:#243c31;margin-bottom:6px;letter-spacing:-.35px}
+.research-panel-heading p,.research-subpanel p{font-size:12px;line-height:1.65;color:#687780}
+.research-search,.research-inputs{display:flex;align-items:end;flex-wrap:wrap;gap:11px}
+.research-search input{flex:1;min-width:220px}
+.research-inputs label{flex:1;min-width:165px}
+.research-shell input:not([type=checkbox]),.research-shell select{border:1px solid #dce5dc;border-radius:7px;min-height:39px;background:#fff;color:#263b30;padding:10px 11px;font-size:13px;width:100%}
+.research-shell label{font-size:11px;font-weight:550;color:#506558;display:grid;gap:7px}
+.research-search select{width:126px}
+.research-search button{white-space:nowrap}
+.research-search .research-leg-label{display:flex;align-items:center;gap:9px}
+.research-search .research-leg-label select{width:74px}
+.research-warning{color:#8b5927;background:#fcf7ec;border:1px solid #f2e1bf;border-radius:7px;padding:12px 14px;font-size:12px;line-height:1.55;display:flex;align-items:start;gap:7px}
+.research-loading{display:flex;gap:8px;align-items:center;color:#596c61;font-size:12px}
+.research-matches,.research-candidates{border:1px solid #e1e9e2;border-radius:8px;max-height:350px;overflow-y:auto}
+.research-result{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 15px;background:#fff;text-align:left;border-bottom:1px solid #e8ede8}
+.research-result:last-child{border-bottom:0}
+.research-result:hover,.research-candidate:hover{background:#f5f9f2}
+.research-result strong,.research-candidate strong{font-weight:650;color:#203f32;font-size:13px}
+.research-result small,.research-candidate small{display:block;color:#778b7c;font-size:11px;margin-top:4px}
+.research-stats{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px}
+.research-subpanel{border:1px solid #e6ece6;border-radius:9px;padding:17px;display:grid;gap:12px}
+.research-subpanel h3{color:#2c4838;font-size:16px}
+.research-table-wrap{overflow:auto;max-height:370px}
+.research-table{border-collapse:collapse;width:100%;font-size:12px;text-align:left}
+.research-table th{color:#74887a;background:#f6f8f4;font-weight:650}
+.research-table td,.research-table th{border-bottom:1px solid #ecf0ed;padding:9px 12px}
+.research-muted{font-size:11px;line-height:1.6;color:#87978a}
+.research-sources{display:flex;align-items:center;gap:15px;flex-wrap:wrap;font-size:11px;color:#607966}
+.research-sources a{display:inline-flex;align-items:center;gap:4px;color:#196347}
+.research-candidate{padding:12px 15px;display:flex!important;gap:12px!important;align-items:center!important;grid-template-columns:none;border-bottom:1px solid #e8eee8;cursor:pointer}
+.research-candidate:last-child{border-bottom:0}
+.research-candidate input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:#23583b}
+.research-candidate span{flex:1}
+.research-slip-line{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #eaf0e9;padding:11px 0;color:#395b47;font-size:12px}
+.research-slip-line span{font-weight:650;white-space:nowrap}
+@media(max-width:930px){.research-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.research-hero{padding:25px}.research-hero h2{font-size:25px}}
+@media(max-width:560px){.research-stats{grid-template-columns:1fr 1fr}.research-panel{padding:16px}.research-hero>svg{display:none}.research-search{display:grid;grid-template-columns:1fr}.research-search select{width:100%}}
