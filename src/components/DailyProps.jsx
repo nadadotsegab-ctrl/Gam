@@ -54,7 +54,7 @@ function sameQuote(a, b) {
     && JSON.stringify(a.referenceBooks) === JSON.stringify(b.referenceBooks);
 }
 
-export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
+export default function DailyProps({ bankroll, oddsFormat, onTrack, onAnalyze }) {
   const initial = useRef(savedSettings());
   const [sport, setSport] = useState(initial.current?.sport || 'ALL');
   const [league, setLeague] = useState(initial.current?.league || 'soccer_epl');
@@ -69,6 +69,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
   const [loading, setLoading] = useState(false);
   const [scanErrors, setScanErrors] = useState([]);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [freeMode, setFreeMode] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [selected, setSelected] = useState(null);
   const [stake, setStake] = useState('');
@@ -109,6 +110,8 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
       if (controller.signal.aborted) return;
       const validLeagues = Array.isArray(data.soccerLeagues) ? data.soccerLeagues.filter(item => item && DEFAULT_LEAGUES.some(candidate => candidate.key === item.key) && typeof item.title === 'string') : [];
       if (validLeagues.length) setSoccerLeagues(validLeagues);
+      setFreeMode(Boolean(data.freeMode));
+      if (data.freeMode) { setAutoRefresh(false); setSport(current => current === 'ALL' ? 'NBA' : current); }
       setStatus(data.configured ? 'configured' : 'unconfigured');
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -127,7 +130,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
     const controller = new AbortController();
     activeScan.current = controller;
     const sequence = ++requestId.current;
-    const requested = sport === 'ALL' ? ['NBA', 'NFL', 'SOCCER'] : [sport];
+    const requested = sport === 'ALL' ? (freeMode ? ['NBA'] : ['NBA', 'NFL', 'SOCCER']) : [sport];
     setLoading(true); setScanErrors([]);
     const errors = [];
     try {
@@ -152,18 +155,18 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
       }
       if (sequence === requestId.current) { setScanErrors(errors); setNow(Date.now()); }
     } finally { if (sequence === requestId.current) setLoading(false); }
-  }, [status, sport, league, timeZone, day, keyFor]);
+  }, [status, sport, league, timeZone, day, keyFor, freeMode]);
 
   useEffect(() => {
-    if (status === 'configured') refresh();
+    if (status === 'configured' && !freeMode) refresh();
     return () => { activeScan.current?.abort(); };
-  }, [refresh, status]);
+  }, [refresh, status, freeMode]);
 
   useEffect(() => {
-    if (!autoRefresh || status !== 'configured') return;
+    if (!autoRefresh || status !== 'configured' || freeMode) return;
     const interval = setInterval(() => { if (!document.hidden) refresh(); }, 300000);
     return () => clearInterval(interval);
-  }, [autoRefresh, refresh, status]);
+  }, [autoRefresh, refresh, status, freeMode]);
 
   const selectedSnapshots = requestedSports.map(value => snapshots[keyFor(value)]).filter(Boolean);
   const currentSnapshots = selectedSnapshots.filter(snapshot => isSnapshotCurrent(snapshot, now, day));
@@ -215,7 +218,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
 
     <div className="props-status-bar"><span className={`props-status-dot ${status === 'configured' ? 'configured' : ''}`}/><strong>{status === 'checking' ? 'Checking data connection…' : status === 'configured' ? 'Provider key detected' : 'Player-prop data not connected'}</strong><span>{status === 'configured' ? 'The Odds API · plan and market access are verified when you scan.' : 'Real props require your own data-provider account.'}</span><button className="text-button" onClick={() => setShowSetup(true)}>Connection guide <ArrowUpRight size={13}/></button></div>
 
-    <div className="props-controls panel"><div className="props-scan-filters"><label className="field">Sport<select value={sport} onChange={e => setSport(e.target.value)}><option value="ALL">NBA + NFL + Soccer</option><option value="NBA">NBA</option><option value="NFL">NFL</option><option value="SOCCER">Soccer</option></select></label><label className="field">Soccer league<select value={league} disabled={sport !== 'ALL' && sport !== 'SOCCER'} onChange={e => setLeague(e.target.value)}>{soccerLeagues.map(value => <option key={value.key} value={value.key}>{value.title}</option>)}</select></label><label className="field">Day timezone<select value={timeZone} onChange={e => setTimeZone(e.target.value)}>{TIME_ZONES.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label><button className="button primary" aria-label="Refresh props" disabled={status !== 'configured' || loading} onClick={refresh}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? 'Scanning props…' : 'Refresh props'}</button></div><div className="props-refresh-row"><label className="auto-refresh"><input type="checkbox" checked={autoRefresh} disabled={status !== 'configured'} onChange={e => setAutoRefresh(e.target.checked)}/>Auto-refresh every 5 minutes while this page is open</label><span><Clock3 size={12}/>Daily scan on opening · cached for 5 minutes</span></div></div>
+    <div className="props-controls panel"><div className="props-scan-filters"><label className="field">Sport<select value={sport} onChange={e => setSport(e.target.value)}><option value="ALL" disabled={freeMode}>NBA + NFL + Soccer</option><option value="NBA">NBA</option><option value="NFL">NFL</option><option value="SOCCER">Soccer</option></select></label><label className="field">Soccer league<select value={league} disabled={sport !== 'ALL' && sport !== 'SOCCER'} onChange={e => setLeague(e.target.value)}>{soccerLeagues.map(value => <option key={value.key} value={value.key}>{value.title}</option>)}</select></label><label className="field">Day timezone<select value={timeZone} onChange={e => setTimeZone(e.target.value)}>{TIME_ZONES.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label><button className="button primary" aria-label="Refresh props" disabled={status !== 'configured' || loading} onClick={refresh}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? 'Scanning props…' : 'Refresh props'}</button></div><div className="props-refresh-row"><label className="auto-refresh"><input type="checkbox" checked={autoRefresh} disabled={status !== 'configured' || freeMode} onChange={e => setAutoRefresh(e.target.checked)}/>Auto-refresh every 5 minutes while this page is open</label><span><Clock3 size={12}/>{freeMode ? 'Free-budget mode · manual scan only · 1 event / market' : 'Daily scan on opening · cached for 5 minutes'}</span></div></div>
 
     {(status === 'unconfigured' || status === 'error') && <section className="props-connect-card"><div className="connect-icon"><Activity size={26}/></div><div><span className="eyebrow">THE NEXT STEP</span><h2>Connect data to get real daily props.</h2><p>UltraX needs current player-prop prices before it can identify an estimated edge. No picks are generated from the demo dashboard.</p><ol><li>Create a data-provider account with NBA, NFL, and soccer player-prop access.</li><li>Add <code>ODDS_API_KEY</code> to your local <code>.env</code> file or secure environment settings.</li><li>Restart UltraX, then check the connection here.</li></ol><div className="props-connect-actions"><button className="button primary" onClick={checkConnection}><RefreshCw size={15}/>Check connection</button><button className="button secondary" onClick={() => setShowSetup(true)}>Show setup steps <ArrowRight size={15}/></button></div><p className="connect-note">Data-provider coverage and pricing vary. Your plan must support the requested player-prop markets.</p>{statusError && <p className="form-error" role="alert">{statusError}</p>}</div></section>}
 
@@ -232,6 +235,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
     {selected && <Modal title="Player prop details" onClose={() => setSelected(null)}><div className="modal-content prop-details"><div className="prop-card-top"><span className={`prop-sport ${selected.sport.toLowerCase()}`}>{sportLabel(selected.sport)}</span><span className="edge-pill">+{selected.ev.toFixed(2)}% estimated EV</span></div><h3>{selected.player}</h3><div className="prop-selection"><strong>{selected.side} {selected.line}</strong><span>{selected.marketLabel || selected.marketKey}</span></div><p className="prop-event">{selected.event} · {time(selected.startsAt)}</p><div className="prop-detail-price"><Book id={selected.book}/><strong>{fmt(selected.odds)}</strong></div><div className="pick-metrics"><div><span>Estimated fair probability</span><strong>{(selected.fairProbability * 100).toFixed(2)}%</strong></div><div><span>¼ Kelly suggestion</span><strong>{money(kellyStake(selected.odds, selected.fairProbability, bankroll))}</strong></div></div>
       {Array.isArray(selected.prices) && selected.prices.length > 0 && <><h4 className="prop-section-heading">SAME PLAYER · SAME LINE</h4><div className="prop-price-comparison">{selected.prices.filter(price => price && books.some(value => value.id === price.book) && Number.isFinite(price.odds) && Math.abs(price.odds) >= 100).map(price => <div key={price.book} className={price.book === selected.book ? 'best' : ''}><Book id={price.book}/><strong>{fmt(price.odds)}</strong></div>)}</div></>}
       <div className="prop-reference-detail"><h4><ShieldCheck size={15}/>Independent price reference</h4><p>Reference books: <strong>{selected.referenceBooks.map(bookName).join(', ')}</strong>. The offered sportsbook is excluded from its own reference.</p><p>For each reference book, both Over and Under prices are normalized to remove the margin, then averaged. That probability is an estimate, not a player-performance forecast.</p><small>Offered price updated {time(selected.priceUpdatedAt)} · Oldest reference {time(selected.referenceUpdatedAt)}</small></div>
+      {onAnalyze && <button type="button" className="button secondary full-width" onClick={() => { onAnalyze(selected); setSelected(null); }}><Search size={15}/>Research this player</button>}
       {!hasCurrentSelection && <p className="form-error" role="alert">This price changed, expired, or the event started. Close this detail and select the current price from the board.</p>}<form onSubmit={track}><label className="field">Stake ($)<input type="number" min="0.01" max="100000000" step="0.01" required value={stake} onChange={e => setStake(e.target.value)}/></label><p className="fine-print">Stake suggestion uses your {money(bankroll)} research bankroll and a quarter of the Kelly fraction.</p>{stakeError && <p className="form-error" role="alert">{stakeError}</p>}<button type="submit" className="button primary full-width" disabled={!hasCurrentSelection}><BookOpen size={15}/>Add to bet tracker</button><p className="modal-footnote">Records your bet in the journal. Does not place a wager.</p></form></div></Modal>}
 
     {showSetup && <Modal title="Connect player-prop data" onClose={() => setShowSetup(false)}><div className="modal-content props-setup"><span className="sample-tag">REAL PRICES REQUIRE A DATA ACCOUNT</span><h3>Connect your own provider account.</h3><p>The built-in connector supports The Odds API’s event player-prop endpoint. Confirm that your plan covers the sports, leagues, sportsbooks, and prop markets you want before subscribing.</p><a className="button secondary" href="https://the-odds-api.com/" target="_blank" rel="noopener noreferrer">Visit The Odds API <ArrowUpRight size={14}/></a><ol><li>Get an API key from your provider account. Do not paste it into this chat or an imported JSON file.</li><li>On your own computer, copy <code>.env.example</code> to <code>.env</code> inside the UltraX folder. Add your key after <code>ODDS_API_KEY=</code> and save as plain text.</li><li>Stop the running server with Control + C, then run <code>npm start</code> again.</li><li>Open Daily props and choose Check connection.</li></ol><p>In the cloud environment, enter the key securely in environment settings and allow <code>api.the-odds-api.com</code>, then restart the server.</p><div className="feed-note"><CircleHelp size={17}/><p>A detected key does not confirm plan access. The scan will report credentials, quota, coverage, and network errors explicitly. Multiple markets are requested per event; provider usage is billed according to its own rules.</p></div><button className="button primary" onClick={() => { setShowSetup(false); checkConnection(); }}><RefreshCw size={15}/>Check connection</button></div></Modal>}

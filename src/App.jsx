@@ -6,9 +6,12 @@ import { parseMarketImport, csvString, betProfit } from './lib/storage.js';
 import Calculators from './components/Calculators.jsx';
 import Modal from './components/Modal.jsx';
 import DailyProps from './components/DailyProps.jsx';
+import ResearchLab from './components/ResearchLab.jsx';
 
 const NAV = [
   { id: 'props', label: 'Daily props', icon: Flame },
+  { id: 'research', label: 'Player research', icon: Search },
+  { id: 'parlay', label: 'Parlay builder', icon: Target },
   { id: 'ev', label: 'Positive EV', icon: Zap },
   { id: 'arbitrage', label: 'Arbitrage', icon: ArrowDownLeft },
   { id: 'odds', label: 'Odds screen', icon: BarChart3 },
@@ -16,7 +19,7 @@ const NAV = [
   { id: 'saved', label: 'Saved picks', icon: Bookmark },
   { id: 'calculators', label: 'Calculators', icon: Calculator },
 ];
-const TITLES = { props: ['Daily props', 'Today’s player props, ranked by estimated market edge.'], ev: ['Positive EV', 'Good bets start with better numbers.'], arbitrage: ['Arbitrage', 'Find price differences. Balance both sides.'], odds: ['Odds screen', 'One market. Every price. A clearer picture.'], tracker: ['Bet tracker', 'Your bets, your results, your progress.'], saved: ['Saved picks', 'Keep the opportunities you want to revisit.'], calculators: ['Calculators', 'Turn the numbers into a clearer decision.'], settings: ['Your workspace', 'Make UltraX work the way you do.'] };
+const TITLES = { research: ['Player research', 'Evidence, trends, and pre-bet checks.'], parlay: ['Parlay builder', 'Review combinations without invented certainty.'], props: ['Daily props', 'Today’s player props, ranked by estimated market edge.'], ev: ['Positive EV', 'Good bets start with better numbers.'], arbitrage: ['Arbitrage', 'Find price differences. Balance both sides.'], odds: ['Odds screen', 'One market. Every price. A clearer picture.'], tracker: ['Bet tracker', 'Your bets, your results, your progress.'], saved: ['Saved picks', 'Keep the opportunities you want to revisit.'], calculators: ['Calculators', 'Turn the numbers into a clearer decision.'], settings: ['Your workspace', 'Make UltraX work the way you do.'] };
 const money = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(v);
 const percent = (v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
 const sports = ['All sports', 'NBA', 'NFL', 'MLB', 'NHL'];
@@ -70,6 +73,7 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [toast, setToast] = useState('');
+  const [researchPrefill, setResearchPrefill] = useState(null);
   const [loadedAt, setLoadedAt] = useState(new Date());
   const [trackerStatus, setTrackerStatus] = useState('all');
   const [stake, setStake] = useState('');
@@ -165,7 +169,9 @@ export default function App() {
 
         {view === 'tracker' && <><div className="stats-grid"><Stat label="Net profit" value={money(profit)} foot="From won and lost bets" icon={TrendingUp} accent /><Stat label="Win rate" value={settledBets.length ? `${(settledBets.filter(b => b.status === 'won').length / settledBets.length * 100).toFixed(1)}%` : '—'} foot={`${settledBets.length} bets settled`} icon={Target}/><Stat label="Open stake" value={money(risk)} foot="Total stake on pending bets" icon={Wallet}/><Stat label="Total bets" value={bets.length} foot="Stored privately in this browser" icon={BookOpen}/></div><div className="source-notice"><ShieldCheck size={15}/><strong>Personal bet journal</strong><span>Logging a bet never places a wager. Settle results manually after the event.</span></div><section className="market-panel"><div className="market-panel-heading"><h2>Your bet history <span className="count-pill">{bets.length}</span></h2><label className="search-field"><Search size={16}/><input aria-label="Search bet history" placeholder="Search your bets…" value={query} onChange={e => setQuery(e.target.value)}/></label></div><div className="tracker-tabs">{['all','pending','won','lost','void'].map(s => <button key={s} onClick={() => setTrackerStatus(s)} className={trackerStatus === s ? 'selected' : ''}>{s === 'all' ? 'All bets' : s[0].toUpperCase()+s.slice(1)}<span>{s === 'all' ? bets.length : bets.filter(b => b.status === s).length}</span></button>)}</div>{!trackedFiltered.length ? <Empty icon={Wallet} title={bets.length ? 'No bets in this view' : 'Every edge starts with a first bet'} text={bets.length ? 'Choose another status or clear the search.' : 'Build your own history. Log an opportunity or add a bet manually.'} action={<button className="button primary" onClick={() => { setFormError(''); setModal('manual'); }}><Plus size={16}/>Add a bet</button>}/> : <div className="table-scroll"><table className="odds-table tracker-table"><thead><tr><th>EVENT / SELECTION</th><th>SPORTSBOOK</th><th>ODDS</th><th>STAKE</th><th>RESULT</th><th>PROFIT</th><th><span className="sr-only">Remove bet</span></th></tr></thead><tbody>{trackedFiltered.map(b => <tr key={b.id}><td><strong>{b.event}</strong><span className="selection-sub">{b.selection} · {b.source || 'Manual entry'}</span></td><td><BookBadge id={b.book} withName/></td><td className="numeric">{fmt(b.odds)}</td><td className="numeric">{money(b.stake)}</td><td><select className={`status-select ${b.status}`} aria-label={`Result for ${b.selection}`} value={b.status} onChange={e => setBets(all => all.map(item => item.id === b.id ? { ...item, status: e.target.value } : item))}>{['pending','won','lost','void'].map(s => <option key={s} value={s}>{s[0].toUpperCase()+s.slice(1)}</option>)}</select></td><td className={`numeric ${betProfit(b) >= 0 ? 'positive' : 'negative'}`}>{b.status === 'pending' ? '—' : money(betProfit(b))}</td><td><button className="icon-button" aria-label={`Delete ${b.selection}`} onClick={() => { setSelected(b); setModal('delete'); }}><Trash2 size={15}/></button></td></tr>)}</tbody></table></div>}</section><p className="fine-print">Your tracker is saved on this device. Export your bets to keep a backup before clearing browser data.</p></>}
 
-        {view === 'props' && <DailyProps bankroll={preferences.bankroll} oddsFormat={preferences.oddsFormat} onTrack={bet => { setBets(v => [{ ...bet, id: crypto.randomUUID(), status: 'pending', createdAt: new Date().toISOString(), source: 'Daily player props · The Odds API' }, ...v]); notify('Player prop added to your journal. No wager has been placed.'); }}/>}
+        {view === 'props' && <DailyProps bankroll={preferences.bankroll} oddsFormat={preferences.oddsFormat} onAnalyze={pick => { setResearchPrefill({name:pick.player,sport:pick.sport,market:pick.marketLabel||pick.marketKey,line:pick.line,odds:pick.odds}); navigate('research'); }} onTrack={bet => { setBets(v => [{ ...bet, id: crypto.randomUUID(), status: 'pending', createdAt: new Date().toISOString(), source: 'Daily player props · The Odds API' }, ...v]); notify('Player prop added to your journal. No wager has been placed.'); }}/>}
+        {view === 'research' && <ResearchLab mode="research" initialSearch={researchPrefill}/>}
+        {view === 'parlay' && <ResearchLab mode="parlay"/>}
         {view === 'calculators' && <Calculators bankroll={preferences.bankroll}/>}
         {view === 'settings' && <Settings preferences={preferences} setPreferences={setPreferences} notify={notify} onData={() => setModal('data')} onExport={exportBets} betCount={bets.length}/>}
       </main>
