@@ -64,6 +64,8 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack, onAnalyze, o
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('checking');
   const [statusError, setStatusError] = useState('');
+  const [keyDiagnostic, setKeyDiagnostic] = useState(null);
+  const [checkingKey, setCheckingKey] = useState(false);
   const [soccerLeagues, setSoccerLeagues] = useState(DEFAULT_LEAGUES);
   const [snapshots, setSnapshots] = useState({});
   const [loading, setLoading] = useState(false);
@@ -96,6 +98,17 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack, onAnalyze, o
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', tick); };
   }, []);
+
+  async function verifyApiKey() {
+    setCheckingKey(true);setKeyDiagnostic(null);
+    try {
+      const response=await fetch('/api/props/check');
+      const data=await response.json();
+      setKeyDiagnostic(data);
+    } catch {
+      setKeyDiagnostic({valid:false,error:'Could not check the key. Restart the UltraX server and retry.'});
+    } finally {setCheckingKey(false);}
+  }
 
   const checkConnection = useCallback(async () => {
     connectionRequest.current?.abort();
@@ -216,7 +229,16 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack, onAnalyze, o
       <div className="props-intro-right"><span className="props-sport-stack"><span>NBA</span><span>NFL</span><span>⚽</span></span><strong>{new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric' }).format(now)}</strong><span>{TIME_ZONES.find(([zone]) => zone === timeZone)?.[1] || timeZone}</span><small>Upcoming events today · one soccer league per scan</small></div>
     </section>
 
-    <div className="props-status-bar"><span className={`props-status-dot ${status === 'configured' ? 'configured' : ''}`}/><strong>{status === 'checking' ? 'Checking data connection…' : status === 'configured' ? 'Provider key detected' : 'Player-prop data not connected'}</strong><span>{status === 'configured' ? 'The Odds API · plan and market access are verified when you scan.' : 'Real props require your own data-provider account.'}</span><button className="text-button" onClick={() => setShowSetup(true)}>Connection guide <ArrowUpRight size={13}/></button></div>
+    <div className="props-status-bar"><span className={`props-status-dot ${status === 'configured' ? 'configured' : ''}`}/><strong>{status === 'checking' ? 'Checking data connection…' : status === 'configured' ? 'API key found (not validated)' : 'Player-prop data not connected'}</strong><span>{status === 'configured' ? 'Check whether your key is accepted before scanning player props.' : 'Real props require your own data-provider account.'}</span><button className="text-button" onClick={() => setShowSetup(true)}>Connection guide <ArrowUpRight size={13}/></button></div>
+
+    {status === 'configured' && <div className="research-key-check" role="region" aria-label="API key diagnostics">
+      <button type="button" className="button secondary" onClick={verifyApiKey} disabled={checkingKey}>{checkingKey?'Checking API key…':'Verify API key (no credits)'}</button>
+      {keyDiagnostic && <div className={keyDiagnostic.valid?'research-muted':'research-warning'} role="status">
+        {keyDiagnostic.valid ? 'Key accepted by The Odds API. ' : 'Key verification failed. '}
+        {keyDiagnostic.message||keyDiagnostic.error||''}
+        {Number.isInteger(keyDiagnostic.remainingCredits) ? ' Remaining credits: '+keyDiagnostic.remainingCredits+'.' : ''}
+      </div>}
+    </div>}
 
     <div className="props-controls panel"><div className="props-scan-filters"><label className="field">Sport<select value={sport} onChange={e => setSport(e.target.value)}><option value="ALL" disabled={freeMode}>NBA + NFL + Soccer</option><option value="NBA">NBA</option><option value="NFL">NFL</option><option value="SOCCER">Soccer</option></select></label><label className="field">Soccer league<select value={league} disabled={sport !== 'ALL' && sport !== 'SOCCER'} onChange={e => setLeague(e.target.value)}>{soccerLeagues.map(value => <option key={value.key} value={value.key}>{value.title}</option>)}</select></label><label className="field">Day timezone<select value={timeZone} onChange={e => setTimeZone(e.target.value)}>{TIME_ZONES.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label><button className="button primary" aria-label="Refresh props" disabled={status !== 'configured' || loading} onClick={refresh}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? 'Scanning props…' : 'Refresh props'}</button></div><div className="props-refresh-row"><label className="auto-refresh"><input type="checkbox" checked={autoRefresh} disabled={status !== 'configured' || freeMode} onChange={e => setAutoRefresh(e.target.checked)}/>Auto-refresh every 5 minutes while this page is open</label><span><Clock3 size={12}/>{freeMode ? 'Free-budget mode · manual scan only · 1 event / market' : 'Daily scan on opening · cached for 5 minutes'}</span></div></div>
 

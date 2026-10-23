@@ -1,4 +1,5 @@
 import { PROP_MARKETS, PROP_SPORTS, localDateKey, rankPlayerProps } from '../src/lib/props.js';
+import { parseProviderError } from './provider-errors.js';
 
 export const SOCCER_LEAGUES = Object.freeze([
   { key: 'soccer_epl', title: 'English Premier League' },
@@ -97,13 +98,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       throw new ProviderError('Could not reach the player-prop provider. Check connectivity or try again shortly.');
     }
     if (!response?.ok) {
-      if ([401, 403].includes(response?.status)) {
-        throw new ProviderError('The provider rejected player-prop access. Check ODDS_API_KEY and that your plan includes event/player-prop markets.', { fatal: true });
-      }
-      if (response?.status === 429) {
-        throw new ProviderError('The player-prop provider quota was reached. Check your plan or try again later.', { fatal: true });
-      }
-      throw new ProviderError('The player-prop provider could not complete a request. Try again shortly.');
+      const upstreamError = await parseProviderError(response);
+      throw new ProviderError(upstreamError.message, { fatal: [401, 403, 429].includes(response.status) });
     }
     try {
       return await response.json();
@@ -133,7 +129,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         const event = requested[index];
         try {
           const detail = await upstream(`/v4/sports/${providerSport}/events/${encodeURIComponent(event.id)}/odds/`, {
-            bookmakers: BOOKMAKERS,
+            ...(freeMode ? { regions: 'us' } : { bookmakers: BOOKMAKERS }),
             markets: Object.keys(PROP_MARKETS[sport]).slice(0, freeMode ? 1 : undefined).join(','),
             oddsFormat: 'american',
             dateFormat: 'iso',
@@ -207,7 +203,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     } catch {
       return false;
     }
-    if (!['/api/props', '/api/props/status', '/api/props/leagues'].includes(url.pathname)) return false;
+    if (!['/api/props', '/api/props/status', '/api/props/leagues', '/api/props/check'].includes(url.pathname)) return false;
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET');
       json(res, 405, { error: 'Use GET for this endpoint.' });
@@ -224,6 +220,43 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         freeMode,
         method: METHOD,
         minReferences: 2,
+      });
+      return true;
+    }
+    if (url.pathname === '/api/props/check') {
+      if (!key) {
+        json(res, 503, { configured:false, valid:false, error:'Add your new API key to a server-side .env file and restart UltraX.' });
+        return true;
+      }
+      // The /v4/sports/ endpoint costs no credits. Only a user-triggered click calls it.
+      const endpoint = new URL('https://api.the-odds-api.com/v4/sports/');
+      endpoint.searchParams.set('apiKey', key);
+      let response;
+      try {
+        response = await fetchImpl(endpoint, {
+          redirect:'error', signal:AbortSignal.timeout(12_000), headers:{ Accept:'application/json' },
+        });
+      } catch {
+        json(res, 503, {configured:true,valid:false,error:'Could not contact The Odds API. Check internet access and retry.'});
+        return true;
+      }
+      if (!response.ok) {
+        const diagnostic = await parseProviderError(response);
+        json(res, 200, {configured:true,valid:false,error:diagnostic.message,code:diagnostic.code,httpStatus:diagnostic.httpStatus});
+        return true;
+      }
+      let sports;
+      try {sports=await response.json();} catch {sports=null;}
+      if (!Array.isArray(sports)) {
+        json(res, 502, {configured:true,valid:false,error:'The provider returned an unexpected sports catalog.'});
+        return true;
+      }
+      const h=response.headers?.get?.('x-requests-remaining');
+      const remaining=h && /^[0-9]+$/.test(h) ? Number(h) : null;
+      json(res, 200, {
+        configured:true,valid:true,checkedAt:new Date(now()).toISOString(),
+        message:'The API key is accepted for the sports catalog. This does not guarantee player-prop market coverage.',
+        remainingCredits:Number.isSafeInteger(remaining)?remaining:null,
       });
       return true;
     }
