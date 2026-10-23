@@ -1,8 +1,9 @@
 import React, {useMemo,useState} from 'react';
 import { calculateSlip } from '../lib/slip.js';
+import { americanToDecimal } from '../lib/odds.js';
 import { Plus, Trash2, Copy, AlertTriangle } from 'lucide-react';
 
-const emptyLeg = () => ({selection:'',event:'',odds:'-110',source:'manual'});
+const emptyLeg = () => ({selection:'',event:'',odds:'',source:'manual'});
 const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
 export default function ManualSlip({importedMarkets=[]}) {
   const [legs,setLegs]=useState([emptyLeg(),emptyLeg()]);
@@ -17,7 +18,7 @@ export default function ManualSlip({importedMarkets=[]}) {
   function addImported(m) {
     const entries=Object.entries(m.odds).filter(([name,value])=>name && Number.isFinite(value)&&Math.abs(value)>=100);
     if(!entries.length){setMessage('No usable American odds in that imported market.');return;}
-    const [book,price]=entries.reduce((a,b)=>Math.abs(b[1])<Math.abs(a[1])?b:a);
+    const [book,price]=entries.reduce((a,b)=>americanToDecimal(b[1])>americanToDecimal(a[1])?b:a);
     const next={selection:m.selection,event:m.event,odds:String(price),source:'imported · '+book};
     setLegs(current=>{
       const empty=current.findIndex(l=>!l.selection.trim());
@@ -41,7 +42,7 @@ export default function ManualSlip({importedMarkets=[]}) {
        <h3>Available imported markets (not live)</h3>
        <div className="research-search"><label>Sport<select value={importSport} onChange={e=>setImportSport(e.target.value)}>{['All','NBA','NFL','MLB','NHL'].map(s=><option key={s}>{s}</option>)}</select></label></div>
        <div className="research-matches">{choices.slice(0,35).map(m=><button type="button" className="research-result" key={m.id} onClick={()=>addImported(m)}><span><strong>{m.selection} · {m.market}</strong><small>{m.event} · Imported snapshot · verify before betting</small></span><Plus size={16}/></button>)}</div>
-       <p className="research-muted">For multiple sportsbooks, the lowest absolute odds may not be the best available price. Confirm the offered price at your chosen sportsbook.</p>
+       <p className="research-muted">For multiple sportsbooks, the best quoted payout is selected from your imported snapshot. Confirm that the offered price is still available at the chosen sportsbook.</p>
     </div>}
     <div className="research-manual-grid">
       {legs.map((leg,i)=><div className="research-subpanel" key={i}>
