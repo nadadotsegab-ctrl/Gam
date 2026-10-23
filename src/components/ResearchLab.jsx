@@ -19,7 +19,7 @@ function Summary({ title, value, subtitle }) {
 }
 function PlayerResearch({initialSearch}) {
  const [sport,setSport]=useState(initialSearch?.sport||'NBA'),[query,setQuery]=useState(initialSearch?.name||''),[matches,setMatches]=useState([]),[selected,setSelected]=useState(null),[report,setReport]=useState(null);
- const [market,setMarket]=useState(MARKETS[initialSearch?.sport]?.[0]?.[0]||'Points'),[line,setLine]=useState('25.5'),[odds,setOdds]=useState('-110');
+ const [market,setMarket]=useState(MARKETS[initialSearch?.sport]?.find(m=>m[0].toLowerCase()===(initialSearch?.market||'').toLowerCase())?.[0]||MARKETS[initialSearch?.sport]?.[0]?.[0]||'Points'),[line,setLine]=useState(String(initialSearch?.line??25.5)),[odds,setOdds]=useState(String(initialSearch?.odds??-110));
  const [loading,setLoading]=useState(false),[loadingReport,setLoadingReport]=useState(false),[error,setError]=useState('');
  const request=useRef(null);
  const options=MARKETS[sport];
@@ -74,7 +74,7 @@ function PlayerResearch({initialSearch}) {
     <div className="research-inputs">
       <label>Analyze market<select aria-label="Research market" value={market} onChange={e=>setMarket(e.target.value)}>{options.map(([label])=><option key={label}>{label}</option>)}</select></label>
       <label>Bookmaker line<input aria-label="Bookmaker line" value={line} type="number" step="0.5" min="0" onChange={e=>setLine(e.target.value)}/></label>
-      <label>American odds (user-entered)<input aria-label="User entered odds" value={odds} type="number" onChange={e=>setOdds(e.target.value)}/></label>
+      <label>American odds (verify current price)<input aria-label="User entered odds" value={odds} type="number" onChange={e=>setOdds(e.target.value)}/></label>
     </div>
     <div className="research-stats">
       <Summary title="Last 5 average" value={history?fmt(history.last5.average):'—'} subtitle={history?history.last5.games+' recorded games':'No matching stats'}/>
