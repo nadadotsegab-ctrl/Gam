@@ -17,9 +17,9 @@ function marketValue(game, keys) {
 function Summary({ title, value, subtitle }) {
   return <div className="stat-card"><div className="stat-label">{title}</div><div className="stat-value">{value}</div><div className="stat-foot">{subtitle}</div></div>;
 }
-function PlayerResearch() {
- const [sport,setSport]=useState('NBA'),[query,setQuery]=useState(''),[matches,setMatches]=useState([]),[selected,setSelected]=useState(null),[report,setReport]=useState(null);
- const [market,setMarket]=useState('Points'),[line,setLine]=useState('25.5'),[odds,setOdds]=useState('-110');
+function PlayerResearch({initialSearch}) {
+ const [sport,setSport]=useState(initialSearch?.sport||'NBA'),[query,setQuery]=useState(initialSearch?.name||''),[matches,setMatches]=useState([]),[selected,setSelected]=useState(null),[report,setReport]=useState(null);
+ const [market,setMarket]=useState(MARKETS[initialSearch?.sport]?.[0]?.[0]||'Points'),[line,setLine]=useState('25.5'),[odds,setOdds]=useState('-110');
  const [loading,setLoading]=useState(false),[loadingReport,setLoadingReport]=useState(false),[error,setError]=useState('');
  const request=useRef(null);
  const options=MARKETS[sport];
@@ -164,4 +164,4 @@ function ParlayBuilder(){
   </section>
  </div>;
 }
-export default function ResearchLab({mode='research'}){return mode==='research'?<PlayerResearch/>:<ParlayBuilder/>;}
+export default function ResearchLab({mode='research'}){return mode==='research'?<PlayerResearch initialSearch={arguments[0]?.initialSearch}/>:<ParlayBuilder/>;}
