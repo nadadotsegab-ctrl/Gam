@@ -85,6 +85,13 @@ function PlayerResearch({initialSearch}) {
     <section className="research-subpanel"><h3>Game-by-game results</h3><p>Season {report.season}. Latest available games first. These are historical results, not a forecast.</p>
       {logs.length?<div className="research-table-wrap"><table className="research-table"><thead><tr><th>Date</th><th>Opponent</th><th>{market}</th><th>Line result</th></tr></thead><tbody>{logs.slice(0,20).map(g=><tr key={g.id}><td>{g.date?new Date(g.date).toLocaleDateString():'Date unknown'}</td><td>{g.opponent||'—'}</td><td>{g.metric}</td><td>{!validLine?'—':g.metric>Number(line)?'Over':g.metric<Number(line)?'Under':'Push'}</td></tr>)}</tbody></table></div>:<p className="research-warning">No parseable {market.toLowerCase()} game logs were returned. This market cannot be analyzed from the current source.</p>}
     </section>
+    <section className="research-subpanel"><h3>Upcoming opponent and rest</h3>
+      {report.nextGame?<><p><strong>{selected.team}</strong> {report.nextGame.homeAway==='away'?'at':'vs'} <strong>{report.nextGame.opponent}</strong> · {new Date(report.nextGame.startsAt).toLocaleString()}</p>
+        <p>Time since most recent recorded game: {logs[0]?.date && Number.isFinite(Date.parse(logs[0].date)) ? Math.max(0,Math.floor((Date.parse(report.nextGame.startsAt)-Date.parse(logs[0].date))/86400000))+' days (approximate)' : 'Unavailable'}.</p>
+        <p className="research-muted">The opponent and rest gap are schedule facts. Defensive matchup quality, projected starters, travel burden, pace and expected minutes have not been modeled.</p>
+      </>:<p>{report.scheduleStatus==='unavailable'?'The game schedule could not be retrieved.':'No upcoming game for this player was identified in the available 7-day fixture window.'}</p>}
+      <div className="research-sources"><a href={report.sources.schedule} target="_blank" rel="noreferrer">Fixture source <ExternalLink size={12}/></a></div>
+    </section>
     <section className="research-subpanel"><h3>Reported injuries and lineup uncertainty</h3>
       <p>{report.injuryStatus==='unavailable'?'Injury feed unavailable.':report.injuries.length?'These listings appeared in the source feed. Verify with official team reports before using them.':'No matching listing in the third-party feed. This does not confirm the player is healthy or starting.'}</p>
       {report.injuries.map((x,i)=><p key={i} className="research-warning"><AlertTriangle size={14}/> {x.status} {x.details}</p>)}
