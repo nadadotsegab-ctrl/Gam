@@ -218,7 +218,7 @@ test('credential, quota, invalid body, timeout, and network errors never leak ke
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const result = await request(handler);
       assert.equal(result.status, 502);
-      assert.match(result.json.error, status === 429 ? /quota/ : /player-prop access/);
+      assert.match(result.json.error, status === 429 ? /rate limit/ : /rejected|denied/);
       assert.equal(result.body.includes(KEY), false);
       assert.equal(result.body.includes('provider private content'), false);
     }
@@ -331,4 +331,47 @@ test('empty schedules and valid events without comparable prices produce honest 
   assert.equal(prices.status, 200);
   assert.equal(prices.json.eventsScanned, 1);
   assert.deepEqual(prices.json.picks, []);
+});
+
+
+test('key checker verifies credentials through zero-credit sports endpoint and reports safe quota metadata',async()=>{
+ let calls=0;
+ const handler=createPropsApiHandler({
+  apiKey:KEY,now:()=>START,
+  fetchImpl:async url=>{
+   calls++;
+   const path=new URL(url).pathname;
+   assert.equal(path,'/v4/sports/');
+   return Response.json([{key:'basketball_nba'}],{headers:{'x-requests-remaining':'480'}});
+  },
+ });
+ const response=await request(handler,'/api/props/check');
+ assert.equal(response.status,200);
+ assert.equal(response.json.valid,true);
+ assert.equal(response.json.remainingCredits,480);
+ assert.equal(calls,1);
+ assert.equal(response.body.includes(KEY),false);
+});
+test('key checker explains invalid keys without returning upstream bodies or secrets',async()=>{
+ const handler=createPropsApiHandler({
+  apiKey:KEY,now:()=>START,
+  fetchImpl:async()=>Response.json({error_code:'INVALID_KEY',message:'secret '+KEY},{status:401}),
+ });
+ const response=await request(handler,'/api/props/check');
+ assert.equal(response.status,200);
+ assert.equal(response.json.valid,false);
+ assert.equal(response.json.code,'INVALID_KEY');
+ assert.match(response.json.error,/invalid/);
+ assert.equal(response.body.includes(KEY),false);
+});
+test('player prop failures show safe exact provider error',async()=>{
+ const handler=createPropsApiHandler({
+  apiKey:KEY,now:()=>START,
+  fetchImpl:async url=>new URL(url).pathname.endsWith('/events/') ? Response.json([event()]) :
+    Response.json({error_code:'INVALID_BOOKMAKERS',message:KEY},{status:403}),
+ });
+ const response=await request(handler);
+ assert.equal(response.status,502);
+ assert.match(response.json.error,/bookmakers|sportsbooks/i);
+ assert.equal(response.body.includes(KEY),false);
 });
