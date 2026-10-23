@@ -135,3 +135,52 @@ npm run test:e2e
 ```
 
 Unit tests exercise betting math, snapshot validation, CSV export, settled profit, player-prop matching/ranking, daily freshness/rollover, and server/provider behavior. Playwright exercises browser flows and starts the development server on port 5173 when needed. Playwright defaults to system Chromium at **`/usr/bin/chromium`**. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to your Chromium executable on other machines before running browser tests.
+
+## Automatic player research and preliminary parlay builder
+
+The **Player research** and **Parlay builder** pages are available on the
+\`feature/research-parlay-foundation\` branch. Use \`npm ci && npm run build && npm start\`
+and visit http://localhost:4173.
+
+**Player research:** Choose NBA, NFL or SOCCER, type part of a player's name,
+click **Search player**, then choose a result. The backend looks up public ESPN
+team rosters and fetches available game logs, injury listings, and future fixtures.
+Data is cached server-side. Supported market averages and historical over/under
+hit counts appear automatically, with source links and timestamps. NFL and
+especially soccer statistics vary by market and competition. If ESPN cannot
+supply or parse a result, the interface reports that limitation rather than
+displaying manufactured player statistics. ESPN endpoints are unofficial and
+subject to provider availability, licensing, and terms of use; verify usage rights
+before making a commercial service.
+
+**Important:** Historical hit rates and bookmaker no-vig consensus are NOT
+model-predicted winning percentages. Current injury reports, teammate changes,
+expected minutes, matchups, and sportsbook prices are not all comprehensively
+verified. Until there is a trained, independently calibrated model and official
+availability confirmation, the player verdict remains **INSUFFICIENT DATA**.
+No feature guarantees winning bets.
+
+**Parlay builder:** Choose a sport, then **Load live candidates** to query the
+existing Odds API provider connector. If real qualifying lines are returned,
+you can select legs manually or build a tentative shortlist from market-price
+discrepancies while avoiding duplicate event IDs. It shows quoted combined odds
+but deliberately does **not** claim a trustworthy combined hit probability or
+guarantee profit. Without \`ODDS_API_KEY\` and permitted player-prop markets, it
+shows a clear connection error and does not invent selections.
+
+**Free API credit controls:** Copy \`.env.example\` to an ignored \`.env\` file.
+\`ODDS_API_FREE_MODE=1\` limits prop scans to one upcoming event and the first
+market per scan, disables automatic startup scanning and five-minute refresh,
+and requires manual refresh to save credits. Only use \`ODDS_API_FREE_MODE=0\`
+after checking your provider plan. This mode does not guarantee that free
+access includes player-prop markets. The public ESPN research endpoints need
+no Odds API key, but are best-effort and may be rate-limited.
+
+Research API endpoints:
+- \`GET /api/research/search?sport=NBA&q=jokic\`
+- \`GET /api/research/player?sport=NBA&id=3112335&name=Nikola%20Jokic\`
+
+Run \`npm test\` for statistical functions and mocked provider endpoints, then
+\`npm run build\` to validate the React bundle. This is an upgrade to the
+existing React/Vite/Node app; no replacement project or new Python runtime is
+required for the research interface.
