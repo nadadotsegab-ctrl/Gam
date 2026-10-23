@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createOddsApiHandler } from './odds-feed.js';
 import { createPropsApiHandler } from './props-feed.js';
+import { createResearchHandler } from './research-feed.js';
 
 const defaultDist = fileURLToPath(new URL('../dist', import.meta.url));
 const mimeTypes = {
@@ -29,9 +30,11 @@ function within(root, candidate) {
 export function createAppServer({ apiKey, fetchImpl, now, distDir = defaultDist } = {}) {
   const handler = createOddsApiHandler({ apiKey, fetchImpl, now });
   const propsHandler = createPropsApiHandler({ apiKey, fetchImpl, now });
+  const researchHandler = createResearchHandler({ fetchImpl, now });
   const root = path.resolve(distDir);
   return http.createServer((req, res) => {
     void (async () => {
+      if (await researchHandler(req, res)) return;
       if (await propsHandler(req, res)) return;
       if (await handler(req, res)) return;
       if (!['GET', 'HEAD'].includes(req.method)) {
