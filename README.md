@@ -1,0 +1,137 @@
+# UltraX
+
+A personal sports-odds research workspace built with React and Vite, with an optional Node server connector for The Odds API. The app opens on Daily props for NBA, NFL, and soccer. Real daily props require a provider account with player-prop coverage. Other tools remain usable with sample or imported markets.
+
+UltraX is an independent reconstruction of a betting analytics workflow. It is not affiliated with OddsJam or any sportsbook. OddsJam inspection was blocked by the cloud environment's network policy (HTTP 403), and the requested REA skill was not available in this workspace. This project does not claim a pixel-perfect copy, proprietary functionality, or access to OddsJam's paid feeds or accounts.
+
+## Run
+
+Requires Node.js **24.5 or newer**. The scripts use Node's `--use-env-proxy` flag to respect the cloud runtime's configured proxy.
+
+For a GitHub checkout or downloaded source ZIP, open a terminal in the folder containing `package.json`, then run:
+
+```sh
+npm ci
+npm run build
+npm start
+```
+
+The app serves port **4173**. GitHub source downloads do not include the generated `dist/` build, so the build command is required before the first start. Keep the terminal open while using UltraX. Actual daily props remain unavailable until you configure a provider key as described below.
+
+For cloud development, from the repository directory:
+
+```sh
+cd /workspace/Gam
+npm ci --cache /workspace/.npm-cache
+npm run dev
+```
+
+For a local checkout, run `npm ci` without the cloud cache option. The development server normally uses port **5173**; use your host's normal browser or port-access mechanism to open the running service.
+
+Build and run the production server:
+
+```sh
+npm run build
+npm start
+```
+
+`npm start` serves `dist/` and the odds connector on port **4173** by default. Optional `PORT` and `HOST` environment variables override the listener. It reads a local `.env` file if present. The development server also supports the server-side connector. `npm run preview` previews static build output and does not provide the odds API.
+
+These commands run the application; they do not publish or deploy it. Each cloud task already has an isolated checkout, so use the existing repository without creating an additional Git worktree.
+
+## Use the workspace
+
+- **Daily props:** scan today’s future NBA/NFL events and a selected soccer league, compare identical player lines, and rank fresh prices by estimated market EV. Without data access, this page shows connection setup and no picks.
+- **Positive EV:** compare offered prices with each market's fair-price reference; inspect prices and a quarter-Kelly stake estimate.
+- **Odds screen:** compare sportsbook prices side by side, then filter, search, and sort markets.
+- **Arbitrage:** inspect sample two-way markets and calculate balanced stakes. This page always uses its own demonstration fixtures, including when other pages use imported or provider data.
+- **Calculators:** calculate arbitrage, expected value, fractional Kelly stakes, and American/decimal odds conversions.
+- **Saved picks:** bookmark selections for later review.
+- **Bet tracker:** log bets, manually mark them won, lost, or void, and export their net results as CSV. Logging a bet never places a wager.
+- **Workspace settings:** change the workspace name, reference bankroll, and displayed odds format.
+
+The overview chart is an illustration, not a record of account performance. EV and Kelly estimates depend on the supplied fair probability; a positive calculation does not guarantee profit. Arbitrage results assume exhaustive opposite outcomes, accepted prices, and matching settlement rules, without fees or limits.
+
+## Import a snapshot
+
+Open **Data source**, then download the example schema or choose a JSON file. An import replaces the active market snapshot; prices remain fixed until another import or provider fetch. Use **Switch back to sample data** to restore the demonstration markets.
+
+The file must contain a `markets` array. This illustrative record is not an actual event listing or sportsbook quote:
+
+```json
+{
+  "markets": [
+    {
+      "id": "example-boston-moneyline",
+      "sport": "NBA",
+      "league": "NBA",
+      "event": "Boston Celtics vs. Los Angeles Lakers",
+      "selection": "Boston Celtics",
+      "market": "Moneyline",
+      "startsAt": "2026-10-24T23:30:00Z",
+      "odds": { "draftkings": 110, "fanduel": 105 },
+      "fairOdds": -105,
+      "trend": [100, 105, 110]
+    }
+  ]
+}
+```
+
+Supported sports are `NBA`, `NFL`, `MLB`, and `NHL`. Supported book IDs are `draftkings`, `fanduel`, `betmgm`, `caesars`, and `pinnacle`. Use unique market IDs, numeric American odds, and ISO timestamps with a timezone. `fairOdds` supplies the probability reference for EV calculations; it is not inferred from your imported offered prices. `trend` is optional. Imports are limited to 500 markets and a file size below 2 MB. Never include credentials in a snapshot.
+
+## Optional provider connection
+
+The server connector supports **The Odds API v4**, fetching two-outcome `h2h` moneyline markets for NBA, NFL, MLB, or NHL. It maps the five supported sportsbooks to the dashboard schema. Available games and books depend on your subscription and the provider's response.
+
+Set `ODDS_API_KEY` securely in the cloud environment settings, or in a local ignored `.env` file using the variable name shown in `.env.example`. Restart the server after changing it. Keep this key server-side: do not use a `VITE_` prefix or put the key in frontend code, imported files, or Git.
+
+In **Data source**, select a sport and choose **Fetch current odds**. Provider prices are fetched snapshots, not a streaming feed. Refresh manually; the server caches each sport for 60 seconds to reduce quota use. The fair-price reference uses normalized two-way Pinnacle probabilities when available, otherwise an equal-weight consensus of normalized bookmaker probabilities. Both are estimates.
+
+The server needs permitted HTTPS access to `api.the-odds-api.com`. The browser calls the application's own `/api/odds/status` and `/api/odds?sport=NBA` endpoints; the provider key stays on the server. Missing configuration, rejected credentials, provider limits, and connection failures are reported without falling back to pretend live prices.
+
+No provider key was configured during development, so a real authenticated provider request has **not** been validated. The provider adapter and error paths can be tested with fixtures independently. Arbitrage remains sample-only and does not use provider snapshots.
+
+## Daily player props
+
+**A data-provider account is required to get actual daily props.** No real provider account or key was available during implementation. The scanner, error handling, and browser flows were validated with simulated provider responses; no real daily picks or authenticated provider access have been verified. This does not unlock OddsJam’s subscription, models, or data.
+
+The built-in connector uses The Odds API event/player-prop endpoints. Before choosing a plan, confirm its current coverage and quota for all sports, markets, and books you need. Free access across all requested props is not promised. The connector supports:
+
+| Sport | Player markets |
+| --- | --- |
+| NBA | Points, rebounds, assists, three-pointers made |
+| NFL | Passing yards, rushing yards, receiving yards, receptions |
+| Soccer | Shots and shots on target in one selected league |
+
+Soccer league choices are EPL, UEFA Champions League, La Liga, MLS, Bundesliga, Serie A, and Ligue 1. These are supported request codes; actual availability depends on the provider. Selecting all sports scans NBA, NFL, and the selected soccer league, with up to 12 upcoming events per sport/league. This is not every soccer league worldwide.
+
+To connect on your Mac:
+
+1. Create a provider account with the required player-prop access and get its API key.
+2. In the UltraX folder, copy `.env.example` to `.env`. Edit the plain-text file and put the key after `ODDS_API_KEY=`. Do not put the key in chat, source code, JSON uploads, or a `VITE_` variable.
+3. Restart `npm start`. Open **Daily props → Check connection**. A detected key means the server sees a value; a successful scan is still needed to establish actual access.
+4. Choose your sports, soccer league, and day timezone. Inspect results and the offered price’s timestamp before recording any bet.
+
+The ranking is a market-price comparison. For every target book, at least two **other** books must supply fresh Over and Under prices for the identical event, player, market, and half-point line. Each reference pair is normalized to remove bookmaker margin; the mean probability estimates EV. The offered book is excluded from its own reference. Integer lines, unmatched markets, stale quotes, next-day events, and started events are excluded. No player-performance, injury, lineup, or minutes-projection model is included.
+
+The board scans on opening and when its sport, league, timezone, or local date changes. Server results are cached for five minutes; displayed snapshots expire after five minutes, while source quotes must be no more than 15 minutes old. Optional refresh every five minutes runs only while this page is open and visible. It is not an email subscription or a background scheduler; closing the app stops browser refresh. Partial coverage and provider failures are shown explicitly. Missing or failed live data is never replaced with invented props.
+
+Open a prop for the same-line sportsbook comparisons, reference books, estimated probability, and quarter-Kelly stake suggestion. Recording a bet creates a manual journal entry and never places a wager. Export the current filtered board as CSV if needed. Price or reference changes during refresh make an old open detail ineligible to log; reopen its current price.
+
+The server exposes `/api/props/status`, `/api/props/leagues`, and `/api/props?sport=NBA&timeZone=America/Denver`. `sport` supports `NBA`, `NFL`, and `SOCCER`; soccer additionally uses `league=soccer_epl` or another supported league. Authentication remains server-side. Missing key returns an explicit 503 response. Provider credentials, plan restrictions, quotas, and actual coverage remain external prerequisites.
+
+## Data and privacy
+
+Saved picks, market snapshots, preferences, daily-prop filter settings, and the bet journal use this browser's local storage. Daily-prop quote snapshots remain in page memory and expire; they are not stored as evergreen picks. There are no user accounts, browser-to-browser sync, sportsbook connections, or real-money wagering. Export CSV before clearing browser data or changing devices; CSV export is a record of bets rather than a restore format. Local browser storage is not an encrypted vault.
+
+The optional provider key is read by the server and used only for upstream odds requests. Imported files do not need to leave the browser. The server has no account authentication or user access control.
+
+## Check the build
+
+```sh
+npm test
+npm run build
+npm run test:e2e
+```
+
+Unit tests exercise betting math, snapshot validation, CSV export, settled profit, player-prop matching/ranking, daily freshness/rollover, and server/provider behavior. Playwright exercises browser flows and starts the development server on port 5173 when needed. Playwright defaults to system Chromium at **`/usr/bin/chromium`**. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to your Chromium executable on other machines before running browser tests.
