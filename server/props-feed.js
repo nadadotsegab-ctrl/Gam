@@ -78,6 +78,8 @@ function eventCandidates(payload, { providerSport, day, timeZone, timestamp }) {
  */
 export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
   const key = typeof apiKey === 'string' ? apiKey.trim() : '';
+  const freeMode = process.env.ODDS_API_FREE_MODE === '1';
+  const maxEvents = freeMode ? 1 : MAX_EVENTS;
   const cache = new Map();
   const pending = new Map();
 
@@ -119,7 +121,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
   async function load({ sport, providerSport, league, timeZone, day }) {
     const listed = await upstream(`/v4/sports/${providerSport}/events/`);
     const candidates = eventCandidates(listed, { providerSport, day, timeZone, timestamp: now() });
-    const requested = candidates.slice(0, MAX_EVENTS);
+    const requested = candidates.slice(0, maxEvents);
     const responses = [];
     let cursor = 0;
     let failures = 0;
@@ -132,7 +134,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         try {
           const detail = await upstream(`/v4/sports/${providerSport}/events/${encodeURIComponent(event.id)}/odds/`, {
             bookmakers: BOOKMAKERS,
-            markets: Object.keys(PROP_MARKETS[sport]).join(','),
+            markets: Object.keys(PROP_MARKETS[sport]).slice(0, freeMode ? 1 : undefined).join(','),
             oddsFormat: 'american',
             dateFormat: 'iso',
           });
@@ -159,7 +161,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     }
     const timestamp = now();
     const warnings = [];
-    if (candidates.length > MAX_EVENTS) warnings.push(`Only the first ${MAX_EVENTS} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
+    if (candidates.length > maxEvents) warnings.push(`Only the first ${maxEvents} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
     if (failures) warnings.push(`${failures} event scan${failures === 1 ? '' : 's'} failed. Picks cover only the events scanned successfully.`);
     return {
       events: responses,
@@ -218,7 +220,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         soccerLeagues: SOCCER_LEAGUES,
         requiresPlayerPropPlan: true,
         cacheSeconds: CACHE_MS / 1000,
-        maxEvents: MAX_EVENTS,
+        maxEvents,
+        freeMode,
         method: METHOD,
         minReferences: 2,
       });
