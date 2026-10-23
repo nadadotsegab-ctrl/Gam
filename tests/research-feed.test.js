@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { normalizeGameLog, createResearchHandler } from '../server/research-feed.js';
+import { normalizeGameLog, createResearchHandler, findUpcomingMatch } from '../server/research-feed.js';
 
 test('ESPN gamelog extracts stats using response schema and sorts by date',()=>{
  const data={names:['minutes','rebounds','assists','points'],events:[
@@ -48,4 +48,13 @@ test('automated player lookup and injury report retain provenance',async()=>{
    const denied=await fetch(origin+'/api/research/player?sport=NBA&id=not-an-id&name=test');
    assert.equal(denied.status,400);
  } finally { await new Promise(resolve=>server.close(resolve)); }
+});
+
+test('upcoming fixture identifies opponent using team identity and ignores past games',()=>{
+ const next=findUpcomingMatch({events:[
+  {id:'past',date:'2026-10-20T12:00Z',competitions:[{competitors:[{team:{id:'7',displayName:'Denver Nuggets'},homeAway:'home'},{team:{id:'2',displayName:'Boston Celtics'},homeAway:'away'}]}]},
+  {id:'future',date:'2026-10-24T12:00Z',competitions:[{competitors:[{team:{id:'7',displayName:'Denver Nuggets'},homeAway:'away'},{team:{id:'3',displayName:'Utah Jazz'},homeAway:'home'}]}]}
+ ]},{teamId:'7',team:'Denver Nuggets'},Date.parse('2026-10-23T12:00Z'));
+ assert.equal(next.opponent,'Utah Jazz');
+ assert.equal(next.homeAway,'away');
 });
