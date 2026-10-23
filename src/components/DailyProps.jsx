@@ -69,6 +69,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
   const [loading, setLoading] = useState(false);
   const [scanErrors, setScanErrors] = useState([]);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [freeMode, setFreeMode] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [selected, setSelected] = useState(null);
   const [stake, setStake] = useState('');
@@ -109,6 +110,8 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
       if (controller.signal.aborted) return;
       const validLeagues = Array.isArray(data.soccerLeagues) ? data.soccerLeagues.filter(item => item && DEFAULT_LEAGUES.some(candidate => candidate.key === item.key) && typeof item.title === 'string') : [];
       if (validLeagues.length) setSoccerLeagues(validLeagues);
+      setFreeMode(Boolean(data.freeMode));
+      if (data.freeMode) { setAutoRefresh(false); setSport(current => current === 'ALL' ? 'NBA' : current); }
       setStatus(data.configured ? 'configured' : 'unconfigured');
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -127,7 +130,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
     const controller = new AbortController();
     activeScan.current = controller;
     const sequence = ++requestId.current;
-    const requested = sport === 'ALL' ? ['NBA', 'NFL', 'SOCCER'] : [sport];
+    const requested = sport === 'ALL' ? (freeMode ? ['NBA'] : ['NBA', 'NFL', 'SOCCER']) : [sport];
     setLoading(true); setScanErrors([]);
     const errors = [];
     try {
@@ -152,18 +155,18 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
       }
       if (sequence === requestId.current) { setScanErrors(errors); setNow(Date.now()); }
     } finally { if (sequence === requestId.current) setLoading(false); }
-  }, [status, sport, league, timeZone, day, keyFor]);
+  }, [status, sport, league, timeZone, day, keyFor, freeMode]);
 
   useEffect(() => {
-    if (status === 'configured') refresh();
+    if (status === 'configured' && !freeMode) refresh();
     return () => { activeScan.current?.abort(); };
-  }, [refresh, status]);
+  }, [refresh, status, freeMode]);
 
   useEffect(() => {
-    if (!autoRefresh || status !== 'configured') return;
+    if (!autoRefresh || status !== 'configured' || freeMode) return;
     const interval = setInterval(() => { if (!document.hidden) refresh(); }, 300000);
     return () => clearInterval(interval);
-  }, [autoRefresh, refresh, status]);
+  }, [autoRefresh, refresh, status, freeMode]);
 
   const selectedSnapshots = requestedSports.map(value => snapshots[keyFor(value)]).filter(Boolean);
   const currentSnapshots = selectedSnapshots.filter(snapshot => isSnapshotCurrent(snapshot, now, day));
@@ -215,7 +218,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack }) {
 
     <div className="props-status-bar"><span className={`props-status-dot ${status === 'configured' ? 'configured' : ''}`}/><strong>{status === 'checking' ? 'Checking data connection…' : status === 'configured' ? 'Provider key detected' : 'Player-prop data not connected'}</strong><span>{status === 'configured' ? 'The Odds API · plan and market access are verified when you scan.' : 'Real props require your own data-provider account.'}</span><button className="text-button" onClick={() => setShowSetup(true)}>Connection guide <ArrowUpRight size={13}/></button></div>
 
-    <div className="props-controls panel"><div className="props-scan-filters"><label className="field">Sport<select value={sport} onChange={e => setSport(e.target.value)}><option value="ALL">NBA + NFL + Soccer</option><option value="NBA">NBA</option><option value="NFL">NFL</option><option value="SOCCER">Soccer</option></select></label><label className="field">Soccer league<select value={league} disabled={sport !== 'ALL' && sport !== 'SOCCER'} onChange={e => setLeague(e.target.value)}>{soccerLeagues.map(value => <option key={value.key} value={value.key}>{value.title}</option>)}</select></label><label className="field">Day timezone<select value={timeZone} onChange={e => setTimeZone(e.target.value)}>{TIME_ZONES.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label><button className="button primary" aria-label="Refresh props" disabled={status !== 'configured' || loading} onClick={refresh}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? 'Scanning props…' : 'Refresh props'}</button></div><div className="props-refresh-row"><label className="auto-refresh"><input type="checkbox" checked={autoRefresh} disabled={status !== 'configured'} onChange={e => setAutoRefresh(e.target.checked)}/>Auto-refresh every 5 minutes while this page is open</label><span><Clock3 size={12}/>Daily scan on opening · cached for 5 minutes</span></div></div>
+    <div className="props-controls panel"><div className="props-scan-filters"><label className="field">Sport<select value={sport} onChange={e => setSport(e.target.value)}><option value="ALL" disabled={freeMode}>NBA + NFL + Soccer</option><option value="NBA">NBA</option><option value="NFL">NFL</option><option value="SOCCER">Soccer</option></select></label><label className="field">Soccer league<select value={league} disabled={sport !== 'ALL' && sport !== 'SOCCER'} onChange={e => setLeague(e.target.value)}>{soccerLeagues.map(value => <option key={value.key} value={value.key}>{value.title}</option>)}</select></label><label className="field">Day timezone<select value={timeZone} onChange={e => setTimeZone(e.target.value)}>{TIME_ZONES.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label><button className="button primary" aria-label="Refresh props" disabled={status !== 'configured' || loading} onClick={refresh}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? 'Scanning props…' : 'Refresh props'}</button></div><div className="props-refresh-row"><label className="auto-refresh"><input type="checkbox" checked={autoRefresh} disabled={status !== 'configured' || freeMode} onChange={e => setAutoRefresh(e.target.checked)}/>Auto-refresh every 5 minutes while this page is open</label><span><Clock3 size={12}/>{freeMode ? 'Free-budget mode · manual scan only · 1 event / market' : 'Daily scan on opening · cached for 5 minutes'}</span></div></div>
 
     {(status === 'unconfigured' || status === 'error') && <section className="props-connect-card"><div className="connect-icon"><Activity size={26}/></div><div><span className="eyebrow">THE NEXT STEP</span><h2>Connect data to get real daily props.</h2><p>UltraX needs current player-prop prices before it can identify an estimated edge. No picks are generated from the demo dashboard.</p><ol><li>Create a data-provider account with NBA, NFL, and soccer player-prop access.</li><li>Add <code>ODDS_API_KEY</code> to your local <code>.env</code> file or secure environment settings.</li><li>Restart UltraX, then check the connection here.</li></ol><div className="props-connect-actions"><button className="button primary" onClick={checkConnection}><RefreshCw size={15}/>Check connection</button><button className="button secondary" onClick={() => setShowSetup(true)}>Show setup steps <ArrowRight size={15}/></button></div><p className="connect-note">Data-provider coverage and pricing vary. Your plan must support the requested player-prop markets.</p>{statusError && <p className="form-error" role="alert">{statusError}</p>}</div></section>}
 
