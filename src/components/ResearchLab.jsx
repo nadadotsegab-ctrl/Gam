@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Search, Activity, AlertTriangle, ArrowRight, RefreshCw, ShieldCheck, Layers3, ExternalLink } from 'lucide-react';
 import { summarizeGames, evaluateProp } from '../lib/research.js';
 import { americanToDecimal, decimalToAmerican } from '../lib/odds.js';
+import ManualSlip from './ManualSlip.jsx';
 
 const MARKETS = {
   NBA: [['Points',['points','pts']], ['Rebounds',['rebounds','reb']], ['Assists',['assists','ast']], ['3-pointers',['threepointfieldgoalsmade','threepointersmade','3pt','3pm']]],
@@ -110,8 +111,10 @@ function PlayerResearch({initialSearch}) {
   </section>}
  </div>;
 }
-function ParlayBuilder(){
+function ParlayBuilder({importedMarkets=[]}){
  const [sport,setSport]=useState('NBA'),[target,setTarget]=useState(3),[available,setAvailable]=useState([]),[selected,setSelected]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[fetched,setFetched]=useState('');
+ const [provider,setProvider]=useState({checking:true,configured:false,freeMode:false});
+ useEffect(()=>{const controller=new AbortController();fetch('/api/props/status',{signal:controller.signal}).then(r=>r.ok?r.json():Promise.reject(new Error('Odds service unavailable'))).then(data=>setProvider({checking:false,configured:Boolean(data.configured),freeMode:Boolean(data.freeMode)})).catch(()=>{if(!controller.signal.aborted)setProvider({checking:false,configured:false,freeMode:false});});return()=>controller.abort();},[]);
  const chosen=available.filter(p=>selected.includes(p.id));
  const differentEvents=chosen.every((p,i)=>chosen.findIndex(v=>v.eventId===p.eventId)===i);
  const decimal=chosen.reduce((x,p)=>x*americanToDecimal(p.odds),1);
@@ -141,11 +144,14 @@ function ParlayBuilder(){
  return <div className="research-shell">
   <section className="research-hero"><div><div className="eyebrow">PARLAY RESEARCH</div><h2>Compare real prices.<br/><span>Understand combined risk.</span></h2><p>Build a tentative shortlist from available sportsbook feeds. We will not label it a likely winner without validated joint probabilities.</p></div><Layers3 size={34}/></section>
   <section className="research-panel">
-   <div className="research-panel-heading"><h2>Build from available live prop candidates</h2><p>Requires ODDS_API_KEY and a plan with prop-market access. A scan can consume your free API credits.</p></div>
+   <div className="research-panel-heading"><h2>Optional: live sportsbook prop candidates</h2><p>Requires a server-side ODDS_API_KEY and a plan covering player props. You can use the calculator below without a key.</p></div>
+   {!provider.checking&&!provider.configured && <div className="research-warning"><AlertTriangle size={16}/>No sportsbook feed is connected. To enable live props, <a href="https://the-odds-api.com/" target="_blank" rel="noreferrer">create your own API key</a> and set ODDS_API_KEY in your server environment (not browser or GitHub). Restart or redeploy the server afterward. Meanwhile, build a manual slip below.</div>}
+   {provider.checking && <p className="research-muted">Checking sportsbook connection…</p>}
+   {provider.configured && provider.freeMode && <p className="research-muted">Free-budget mode: manual scans use one event and one market per request; incomplete selections are expected.</p>}
    <div className="research-search">
     <select aria-label="Parlay sport" value={sport} onChange={e=>{setSport(e.target.value);setAvailable([]);setSelected([]);}}>{Object.keys(MARKETS).map(s=><option key={s}>{s}</option>)}</select>
     <label className="research-leg-label">Target legs <select value={target} onChange={e=>setTarget(Number(e.target.value))}>{[2,3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-    <button className="button primary" disabled={busy} onClick={scan}>{busy?'Loading candidates…':'Load live candidates'}</button>
+    <button className="button primary" disabled={busy||provider.checking||!provider.configured} onClick={scan}>{busy?'Loading candidates…':'Load live candidates'}</button>
     <button className="button secondary" disabled={busy||available.length<2} onClick={suggest}>Suggest shortlist</button>
    </div>
    {error && <p className="research-warning"><AlertTriangle size={15}/> {error}</p>}
@@ -169,6 +175,7 @@ function ParlayBuilder(){
        {chosen.map(p=><p key={p.id} className="research-slip-line">{p.player} — {p.side} {p.line} {p.marketLabel||p.marketKey} <span>{p.odds>0?'+':''}{p.odds}</span></p>)}
     </>:<p className="research-muted">Load live props and choose picks, or use Suggest shortlist to pick non-overlapping games from available market discrepancies. If no feed is connected, UltraX won't generate fake picks.</p>}
   </section>
+  <ManualSlip importedMarkets={importedMarkets}/>
  </div>;
 }
-export default function ResearchLab({mode='research',initialSearch=null}){return mode==='research'?<PlayerResearch initialSearch={initialSearch}/>:<ParlayBuilder/>;}
+export default function ResearchLab({mode='research',initialSearch=null,importedMarkets=[]}){return mode==='research'?<PlayerResearch initialSearch={initialSearch}/>:<ParlayBuilder importedMarkets={importedMarkets}/>;}
