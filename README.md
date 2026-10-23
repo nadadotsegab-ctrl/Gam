@@ -184,3 +184,39 @@ Run \`npm test\` for statistical functions and mocked provider endpoints, then
 \`npm run build\` to validate the React bundle. This is an upgrade to the
 existing React/Vite/Node app; no replacement project or new Python runtime is
 required for the research interface.
+
+
+## When Daily Props says "Player-prop data not connected"
+
+This is a missing **provider credential**, not a broken page. You cannot retrieve
+real sportsbook player-prop odds without an appropriate provider account and
+server-side credential.
+
+There are **two separate workflows**:
+
+1. **No key required:** Open Parlay builder and use the **Build a parlay without
+   an API key** section. Enter 2–8 selections and their actual American odds
+   to calculate quoted combined payout and potential profit. This tool never
+   invents model probabilities. If you used **Data source → Import a market
+   snapshot**, those imported markets appear as selectable items, marked
+   **not live**. The built-in demo markets do not appear as real recommendations.
+2. **Live feed:** Register for a key at https://the-odds-api.com/ and set the
+   following values in an ignored \`.env\` file at the project root or in your
+   host's server-side environment-variable settings:
+
+   \`\`\`env
+   ODDS_API_KEY=YOUR_REAL_KEY
+   ODDS_API_FREE_MODE=1
+   \`\`\`
+
+   Restart \`npm start\` locally or redeploy your server in the hosting platform,
+   then press **Check connection** on Daily Props. Confirm your provider account
+   permits the requested sport and player-prop markets. Do not place
+   \`ODDS_API_KEY\` in a frontend \`VITE_\` variable, commit it to GitHub, or
+   share the key publicly.
+
+On the free odds budget, live scans are manual and limited to one upcoming
+event and one player market; many legitimate queries will return no qualifying
+positive-EV prop. The manual builder works independently. **Neither workflow
+is an injury-aware or statistically validated predictive model**, and no
+parlay win probability is claimed.
