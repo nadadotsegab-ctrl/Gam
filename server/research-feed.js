@@ -10,6 +10,7 @@ const CATALOG_TTL = 6 * 60 * 60_000;
 const REPORT_TTL = 20 * 60_000;
 const catalogCache = new Map();
 const reportCache = new Map();
+const scheduleCache = new Map();
 
 function respond(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -87,6 +88,21 @@ function matchInjuries(payload, playerId, name) {
   return matches.slice(0,5);
 }
 
+
+export function findUpcomingMatch(payload, player, timestamp) {
+ const events=Array.isArray(payload?.events)?payload.events:[];
+ for(const event of events.sort((a,b)=>Date.parse(a.date)-Date.parse(b.date))) {
+   if(!Number.isFinite(Date.parse(event.date)) || Date.parse(event.date)<=timestamp) continue;
+   const competitors=event.competitions?.[0]?.competitors;
+   if(!Array.isArray(competitors) || competitors.length!==2)continue;
+   const ours=competitors.find(c=>String(c.team?.id||'')===String(player.teamId||'') || (player.team&&keyOf(c.team?.displayName)===keyOf(player.team)));
+   if(!ours)continue;
+   const opponent=competitors.find(c=>c!==ours);
+   return {eventId:String(event.id||''),startsAt:event.date,opponent:opponent?.team?.displayName||'Unknown opponent',homeAway:ours.homeAway||'',event:event.name||''};
+ }
+ return null;
+}
+
 export function createResearchHandler({fetchImpl=globalThis.fetch, now=()=>Date.now()}={}) {
   async function getJson(url) {
     let r;
@@ -117,7 +133,7 @@ export function createResearchHandler({fetchImpl=globalThis.fetch, now=()=>Date.
           const team=selections[index++];
           try {
             const roster=await getJson('https://site.api.espn.com/apis/site/v2/sports/'+path+'/teams/'+team.id+'/roster');
-            results.push(...athleteRows(roster).map(x=>({...x,team:team.displayName || team.name || ''})));
+            results.push(...athleteRows(roster).map(x=>({...x,team:team.displayName || team.name || '',teamId:String(team.id)})));
           } catch { /* Partial coverage: never invent missing player profiles. */ }
         }
       }
@@ -133,12 +149,18 @@ export function createResearchHandler({fetchImpl=globalThis.fetch, now=()=>Date.
   }
   async function report(sport,id,name) {
     const {path}=CONFIG[sport];
+    const known=(await catalog(sport)).find(p=>p.id===id);
+    if (!known) throw new Error('Player not found in the currently available roster.');
     return cached(reportCache,[sport,id].join(':'),REPORT_TTL,async()=>{
       const currentYear=new Date(now()).getUTCFullYear();
       const season=sport==='NBA' ? (new Date(now()).getUTCMonth()>=7?currentYear+1:currentYear) : currentYear;
       const gamelogUrl='https://site.web.api.espn.com/apis/common/v3/sports/'+path+'/athletes/'+id+'/gamelog?season='+season;
       const injuriesUrl='https://site.api.espn.com/apis/site/v2/sports/'+path+'/injuries';
-      const [gamelog,injuryFeed]=await Promise.allSettled([getJson(gamelogUrl),getJson(injuriesUrl)]);
+      const today=new Date(now());
+      const later=new Date(now()+7*86400000);
+      const dateKey=d=>d.toISOString().slice(0,10).replace(/-/g,'');
+      const scheduleUrl='https://site.api.espn.com/apis/site/v2/sports/'+path+'/scoreboard?dates='+dateKey(today)+'-'+dateKey(later)+'&limit=100';
+      const [gamelog,injuryFeed,scheduleFeed]=await Promise.allSettled([getJson(gamelogUrl),getJson(injuriesUrl),cached(scheduleCache,sport+':'+dateKey(today),15*60_000,()=>getJson(scheduleUrl))]);
       let games=gamelog.status==='fulfilled'?normalizeGameLog(gamelog.value,sport):[];
       let usedSeason=season;
       // Early-season research may need last season for a descriptive baseline.
@@ -150,17 +172,20 @@ export function createResearchHandler({fetchImpl=globalThis.fetch, now=()=>Date.
         } catch { /* Keep honest empty state. */ }
       }
       return {
-        player:{id,name,sport},
+        player:{...known,sport},
+        nextGame:scheduleFeed.status==='fulfilled'?findUpcomingMatch(scheduleFeed.value,known,now()):null,
+        scheduleStatus:scheduleFeed.status==='fulfilled'?'checked':'unavailable',
         games, season:usedSeason,
         gamelogStatus:gamelog.status==='fulfilled'?'available':'unavailable',
-        injuries: injuryFeed.status==='fulfilled'?matchInjuries(injuryFeed.value,id,name):[],
+        injuries: injuryFeed.status==='fulfilled'?matchInjuries(injuryFeed.value,id,known.name):[],
         injuryStatus:injuryFeed.status==='fulfilled'?'feed-checked':'unavailable',
         // Absence from a third-party feed does not confirm fitness.
         injuriesVerified:false, oddsVerified:false,
-        sources:{gamelog:gamelogUrl.replace('season='+season,'season='+usedSeason),injuries:injuriesUrl},
+        sources:{gamelog:gamelogUrl.replace('season='+season,'season='+usedSeason),injuries:injuriesUrl,schedule:scheduleUrl},
         fetchedAt:new Date(now()).toISOString(), source:SOURCE,
         warnings:[
           ...(gamelog.status==='rejected'?['Player game logs are unavailable from ESPN.']:[]),
+          ...(scheduleFeed.status==='rejected'?['Current fixtures could not be verified.']:[]),
           ...(injuryFeed.status==='rejected'?['Injury feed could not be reached.']:['ESPN injury listings are not an official active/inactive confirmation.']),
           ...(sport==='SOCCER'?['Soccer player game logs have limited support; some prop markets cannot be analyzed.']:[])
         ]
