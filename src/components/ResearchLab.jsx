@@ -164,4 +164,4 @@ function ParlayBuilder(){
   </section>
  </div>;
 }
-export default function ResearchLab({mode='research'}){return mode==='research'?<PlayerResearch initialSearch={arguments[0]?.initialSearch}/>:<ParlayBuilder/>;}
+export default function ResearchLab({mode='research',initialSearch=null}){return mode==='research'?<PlayerResearch initialSearch={initialSearch}/>:<ParlayBuilder/>;}
