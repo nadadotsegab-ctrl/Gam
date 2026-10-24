@@ -64,11 +64,13 @@ export function normalizeGameLog(payload, sport) {
         node.stats.forEach((raw,i)=>{
           const key=String(header[i]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
           const basic=finite(raw);
+          const duration=['minutes','min'].includes(key)&&typeof raw==='string'&&/^\d{1,3}:[0-5]\d$/.test(raw)
+            ? Number(raw.split(':')[0])+Number(raw.split(':')[1])/60 : null;
           // Some shooting categories use made-attempted text (3-9). Only
           // derive the made number for recognized shooting fields.
           const shooting=['3pt','3pm','threepointsmade','threepointfieldgoalsmade'].includes(key);
           const made=shooting&&typeof raw==='string'&&/^\d+-\d+$/.test(raw)?Number(raw.split('-')[0]):null;
-          const number=basic??made;
+          const number=basic??made??duration;
           if(key && number!==null)values[key]=number;
         });
         const date=node.date||node.gameDate||meta.date||meta.gameDate||node.event?.date||null;
