@@ -354,3 +354,45 @@ remain missing: no replacement is invented.
 
 Historical rolling estimates are **not** calibrated win probabilities and
 cannot establish that a parlay is profitable or safe.
+
+## Why the old Parlay Builder looked unchanged
+
+The earlier one-game scanner could only research players with a *positive
+market-price discrepancy*. This meant otherwise interesting props never
+reached the research engine; opposite outcomes for one player could be the
+only visible candidates. Code in GitHub must also be pulled and rebuilt
+locally before the browser will show the new interface.
+
+The updated **Parlay Builder** has a distinct Research Slate mode:
+
+- **Research first 5 games** explicitly requests up to five upcoming
+  games in a single selected prop market in free-budget mode.
+- **Research next 5 games** can inspect further games. These calls are
+  manual and subject to provider quota. With one US region and one market,
+  The Odds API documents up to one credit per event with that market returned,
+  so a 5-event scan may use up to 5 credits. Check the provider dashboard.
+- The researcher now includes comparable lines *regardless of market EV sign*.
+  Negative market EV is displayed as **no positive market edge**, not as an
+  attractive bet or an automatic parlay recommendation.
+- The automatic research shortlist continues to require verified player/game
+  identity, enough dated game logs, historical trend agreement and a
+  positive price-based market edge. No qualifying signals means no shortlist,
+  not fabricated picks.
+- The app warns if the running local server has not been updated to the
+  Research Slate backend. A successful GitHub build is not a live data test.
+
+To activate changes on a local Mac after merging the pull request:
+
+```bash
+# Stop the previous npm start server with Control+C first.
+git switch main
+git pull origin main
+npm ci
+npm run build
+npm start
+```
+
+This is still an exploratory statistics/research tool. It cannot automatically
+verify official final lineups, precise injury-driven usage, true predictive
+probabilities, or parlay correlations using only the currently connected free
+data services. It must not claim guaranteed outcomes.
