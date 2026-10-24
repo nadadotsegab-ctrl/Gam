@@ -29,8 +29,8 @@ function within(root, candidate) {
 /** Serve a built frontend and the server-only live-odds API. */
 export function createAppServer({ apiKey, fetchImpl, now, distDir = defaultDist } = {}) {
   const handler = createOddsApiHandler({ apiKey, fetchImpl, now });
-  const propsHandler = createPropsApiHandler({ apiKey, fetchImpl, now });
   const researchHandler = createResearchHandler({ fetchImpl, now });
+  const propsHandler = createPropsApiHandler({ apiKey, fetchImpl, now, researchAssess: researchHandler.assessPicks });
   const root = path.resolve(distDir);
   return http.createServer((req, res) => {
     void (async () => {
