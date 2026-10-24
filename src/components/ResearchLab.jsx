@@ -136,12 +136,12 @@ function ParlayBuilder({importedMarkets=[]}) {
  const [sport,setSport]=useState('NBA'),[target,setTarget]=useState(3),[marketFilter,setMarketFilter]=useState('player_points');
  const [snapshots,setSnapshots]=useState([]),[selected,setSelected]=useState([]),[error,setError]=useState('');
  const [busy,setBusy]=useState(false),[fetched,setFetched]=useState(''),[now,setNow]=useState(Date.now());
- const [provider,setProvider]=useState({checking:true,configured:false,freeMode:false});
+ const [provider,setProvider]=useState({checking:true,configured:false,freeMode:false,researchModeSupported:false});
  const [nextOffset,setNextOffset]=useState(0),[totalEvents,setTotalEvents]=useState(null);
  useEffect(()=>{const controller=new AbortController();
    fetch('/api/props/status',{signal:controller.signal})
     .then(r=>r.ok?r.json():Promise.reject(new Error('Odds service unavailable')))
-    .then(data=>setProvider({checking:false,configured:Boolean(data.configured),freeMode:Boolean(data.freeMode)}))
+    .then(data=>setProvider({checking:false,configured:Boolean(data.configured),freeMode:Boolean(data.freeMode),researchModeSupported:Boolean(data.researchModeSupported)}))
     .catch(()=>{if(!controller.signal.aborted)setProvider({checking:false,configured:false,freeMode:false});});
    return()=>controller.abort();
  },[]);
@@ -213,6 +213,7 @@ function ParlayBuilder({importedMarkets=[]}) {
      <div className="research-panel-heading"><h2>Research today's available games</h2><p>One click scans up to five upcoming games in your chosen prop market. All comparable Over/Under prices are researched, even when there is NO market edge. Live quota may be used.</p></div>
      {!provider.checking&&!provider.configured&&<p className="research-warning">No sportsbook feed connected. Configure ODDS_API_KEY privately, or use the manual calculator below.</p>}
      {provider.checking&&<p className="research-muted">Checking sportsbook connection…</p>}
+     {!provider.checking&&!provider.researchModeSupported&&<p className="research-warning">Your running UltraX server does not have the latest research-slate API. Stop the server, run git pull origin main, npm run build, then npm start. Check that this warning disappears.</p>}
      <div className="research-search">
        <select aria-label="Parlay sport" value={sport} onChange={e=>changeSport(e.target.value)}>{Object.keys(MARKETS).map(s=><option key={s}>{s}</option>)}</select>
        {provider.freeMode && <label className="research-leg-label">Prop market <select aria-label="Research prop market" value={marketFilter} onChange={e=>{setMarketFilter(e.target.value);setSnapshots([]);setSelected([]);setNextOffset(0);setTotalEvents(null);setError('');}}>{Object.entries(PROP_MARKETS[sport]).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
