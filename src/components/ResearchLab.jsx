@@ -5,6 +5,7 @@ import { projectValues } from '../lib/forecast.js';
 import { americanToDecimal, decimalToAmerican } from '../lib/odds.js';
 import ManualSlip from './ManualSlip.jsx';
 import { conflictsWithSlip, summarizeEligibility } from '../lib/parlay-candidates.js';
+import { PROP_MARKETS } from '../lib/props.js';
 
 const MARKETS = {
   NBA: [['Points',['points','pts']], ['Rebounds',['rebounds','reb']], ['Assists',['assists','ast']], ['3-pointers',['threepointfieldgoalsmade','threepointersmade','3pt','3pm']]],
@@ -132,7 +133,7 @@ function PlayerResearch({initialSearch}) {
 }
 
 function ParlayBuilder({importedMarkets=[]}) {
- const [sport,setSport]=useState('NBA'),[target,setTarget]=useState(3);
+ const [sport,setSport]=useState('NBA'),[target,setTarget]=useState(3),[marketFilter,setMarketFilter]=useState('player_points');
  const [snapshots,setSnapshots]=useState([]),[selected,setSelected]=useState([]),[error,setError]=useState('');
  const [busy,setBusy]=useState(false),[fetched,setFetched]=useState(''),[now,setNow]=useState(Date.now());
  const [provider,setProvider]=useState({checking:true,configured:false,freeMode:false});
@@ -150,7 +151,7 @@ function ParlayBuilder({importedMarkets=[]}) {
    .filter(p=>Number.isFinite(p.ev)&&Number.isFinite(p.odds)&&p.eventId
       && Number.isFinite(Date.parse(p.startsAt))&&Date.parse(p.startsAt)>now)
    .map(p=>[p.id,p])).values());
- const readyCandidates=available.filter(p=>summarizeEligibility([p],1).canSuggest);
+ const readyCandidates=available.filter(p=>p.ev>0 && summarizeEligibility([p],1).canSuggest);
  const selectedPicks=available.filter(p=>selected.includes(p.id));
  const differentEvents=selectedPicks.every((p,i)=>selectedPicks.findIndex(v=>v.eventId===p.eventId)===i);
  const decimal=selectedPicks.reduce((x,p)=>x*americanToDecimal(p.odds),1);
@@ -164,9 +165,9 @@ function ParlayBuilder({importedMarkets=[]}) {
    if(!next){setSnapshots([]);setSelected([]);setTotalEvents(null);setNextOffset(0);setFetched('');}
    const offset=next?nextOffset:0;
    try{
-     const params=new URLSearchParams({sport,timeZone:'America/Denver',
+     const params=new URLSearchParams({sport,timeZone:'America/Denver',mode:'research',
        ...(sport==='SOCCER'?{league:'soccer_epl'}:{}),
-       ...(provider.freeMode?{eventOffset:String(offset)}:{})});
+       ...(provider.freeMode?{eventOffset:String(offset),eventCount:'5',market:marketFilter}:{})});
      const response=await fetch('/api/props?'+params);
      const data=await response.json();
      if(!response.ok)throw new Error(data.error||'No current prop provider available.');
@@ -178,8 +179,8 @@ function ParlayBuilder({importedMarkets=[]}) {
      setNow(Date.now());setFetched(data.fetchedAt||new Date().toISOString());
      setTotalEvents(data.eventsAvailable);
      setNextOffset(offset+Math.max(data.eventsRequested,1));
-     if(!data.picks.length)setError('This game had no qualifying price candidates. '+(provider.freeMode?'You can scan the next game, but it may use more API credits.':'No selections were fabricated.'));
-     else if(provider.freeMode)setError('Scanned '+(offset+1)+' of '+data.eventsAvailable+' upcoming games. More games may have different candidates; each manual scan may spend API credits.');
+     if(!data.picks.length)setError('The scanned games had no usable matching sportsbook prices. Try another market or scan the next games. No selections were invented.');
+     else if(provider.freeMode)setError('Researched events '+(offset+1)+'–'+(offset+data.eventsRequested)+' of '+data.eventsAvailable+'. Candidates include fair/negative-price lines for research, NOT recommendations.');
    }catch(e){setError(e.message);}
    finally{setBusy(false);}
  }
@@ -209,18 +210,19 @@ function ParlayBuilder({importedMarkets=[]}) {
  return <div className="research-shell">
    <section className="research-hero"><div><div className="eyebrow">PARLAY RESEARCH</div><h2>Compare real prices.<br/><span>Understand combined risk.</span></h2><p>Build a research shortlist from separate events when actual player history and prices agree. Unverified injuries, rotations, and uncalibrated probabilities remain visible.</p></div><Layers3 size={34}/></section>
    <section className="research-panel">
-     <div className="research-panel-heading"><h2>Live sportsbook candidate research</h2><p>Requires server-side Odds API access. With free-budget mode, every explicit scan examines only ONE additional event/market, conserving credits.</p></div>
+     <div className="research-panel-heading"><h2>Research today's available games</h2><p>One click scans up to five upcoming games in your chosen prop market. All comparable Over/Under prices are researched, even when there is NO market edge. Live quota may be used.</p></div>
      {!provider.checking&&!provider.configured&&<p className="research-warning">No sportsbook feed connected. Configure ODDS_API_KEY privately, or use the manual calculator below.</p>}
      {provider.checking&&<p className="research-muted">Checking sportsbook connection…</p>}
      <div className="research-search">
        <select aria-label="Parlay sport" value={sport} onChange={e=>changeSport(e.target.value)}>{Object.keys(MARKETS).map(s=><option key={s}>{s}</option>)}</select>
+       {provider.freeMode && <label className="research-leg-label">Prop market <select aria-label="Research prop market" value={marketFilter} onChange={e=>{setMarketFilter(e.target.value);setSnapshots([]);setSelected([]);setNextOffset(0);setTotalEvents(null);setError('');}}>{Object.entries(PROP_MARKETS[sport]).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
        <label className="research-leg-label">Target legs <select value={target} onChange={e=>setTarget(Number(e.target.value))}>{[2,3,4,5,6,7,8].map(n=><option key={n}>{n}</option>)}</select></label>
-       <button type="button" className="button primary" disabled={busy||provider.checking||!provider.configured} onClick={()=>scan(false)}>{busy?'Scanning…':'Scan first game'}</button>
-       {provider.freeMode&&<button type="button" className="button secondary" disabled={busy||!canScanNext} onClick={()=>scan(true)}>Scan next game (uses credits)</button>}
+       <button type="button" className="button primary" disabled={busy||provider.checking||!provider.configured} onClick={()=>scan(false)}>{busy?'Researching…':provider.freeMode?'Research first 5 games':'Research available games'}</button>
+       {provider.freeMode&&<button type="button" className="button secondary" disabled={busy||!canScanNext} onClick={()=>scan(true)}>Research next 5 games (uses credits)</button>}
        <button type="button" className="button secondary" disabled={busy||readyEvents<2} onClick={suggest}>Suggest research shortlist</button>
      </div>
-     <p className="research-muted">Games with price candidates: {distinctEvents}. Distinct games meeting historical research requirements: {readyEvents}. Target: {target}. {totalEvents!==null?'Available upcoming games: '+totalEvents+'. '+(nextOffset<totalEvents?'Next game: '+(nextOffset+1)+'.':'No further games in this window.') : 'Scan games individually to expand coverage.'}</p>
-     {provider.freeMode&&<p className="research-muted">Each new game can consume API credits. Previously scanned results are cached briefly; prices older than five minutes automatically disappear. Scanning more games never guarantees more props or a validated parlay.</p>}
+     <p className="research-muted">Games with comparable prices: {distinctEvents}. Games passing historical research: {readyEvents}. Requested parlay legs: {target}. {totalEvents!==null?'Available upcoming games: '+totalEvents+'. '+(nextOffset<totalEvents?'Next game: '+(nextOffset+1)+'.':'No further games in this window.') : 'Scan a batch to examine more than one matchup.'}</p>
+     {provider.freeMode&&<p className="research-muted">Each click can use up to 5 event-market-region credits according to the provider's usage rules (US region, one market). Previously scanned quotes expire after five minutes. Scanning more games never guarantees more props or a validated parlay.</p>}
      {error&&<p className="research-warning" role="status"><AlertTriangle size={15}/> {error}</p>}
      {fetched&&<p className="research-muted">Latest sportsbook fetch: {new Date(fetched).toLocaleString()} · price consensus is not a player-performance forecast.</p>}
      {available.length>0&&<div className="research-candidates">{available.slice(0,40).map(p=>
@@ -229,7 +231,7 @@ function ParlayBuilder({importedMarkets=[]}) {
          disabled={p.research?.status==='BLOCKED'||(!selected.includes(p.id)&&(selected.length>=8||conflictsWithSlip(p,selectedPicks)))}
          onChange={e=>toggle(p,e.target.checked)}/>
         <span><strong>{p.player} — {p.side} {p.line} {p.marketLabel||p.marketKey}</strong>
-         <small>{p.event} · {p.book} · {p.odds>0?'+':''}{p.odds} · market price discrepancy {p.ev.toFixed(1)}%</small>
+         <small>{p.event} · {p.book} · {p.odds>0?'+':''}{p.odds} · {p.ev>0?'Market edge +'+p.ev.toFixed(1)+'%':'No positive market edge ('+p.ev.toFixed(1)+'%)'}</small>
          <small><strong>Research: {p.research?.status||'NOT CHECKED'}</strong> · {p.research?.verifiedChecks??0}/{p.research?.totalChecks??9} verified checks
           {p.research?.historical?.last10?.games?' · '+p.research.historical.last10.games+' recorded games':' · missing usable game history'}</small>
          {p.research?.forecast?.ready?
