@@ -6,3 +6,8 @@ playwright-report/
 .env.*
 !.env.example
 *.log
+
+# Private/exported historical odds datasets and local model reports
+backtest.json
+historical-props*.csv
+research-exports/
