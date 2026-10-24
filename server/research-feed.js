@@ -274,31 +274,43 @@ export function createResearchHandler({fetchImpl=globalThis.fetch, now=()=>Date.
       const dateKey=d=>d.toISOString().slice(0,10).replace(/-/g,'');
       const scheduleUrl='https://site.api.espn.com/apis/site/v2/sports/'+path+'/scoreboard?dates='+dateKey(today)+'-'+dateKey(later)+'&limit=100';
       const [gamelog,injuryFeed,scheduleFeed]=await Promise.allSettled([getJson(gamelogUrl),getJson(injuriesUrl),cached(scheduleCache,sport+':'+dateKey(today),15*60_000,()=>getJson(scheduleUrl))]);
-      let games=gamelog.status==='fulfilled'?normalizeGameLog(gamelog.value,sport):[];
-      let usedSeason=season;
-      // Early-season research may need last season for a descriptive baseline.
-      if (!games.length && gamelog.status==='fulfilled') {
+      const currentGames=gamelog.status==='fulfilled'?normalizeGameLog(gamelog.value,sport):[];
+      let games=[...currentGames];
+      let previousGames=[];
+      const previousUrl=gamelogUrl.replace('season='+season,'season='+(season-1));
+      // NBA season is still young in October. Previous-season games can supply
+      // a descriptively useful baseline, but we flag offseason/role uncertainty.
+      // Never claim those old games are current-season form.
+      if(currentGames.length<18){
         try {
-          const previous=await getJson(gamelogUrl.replace('season='+season,'season='+(season-1)));
-          games=normalizeGameLog(previous,sport);
-          usedSeason=season-1;
-        } catch { /* Keep honest empty state. */ }
+          const previous=await getJson(previousUrl);
+          previousGames=normalizeGameLog(previous,sport);
+          const ids=new Set(games.map(g=>g.id));
+          for(const game of previousGames)if(!ids.has(game.id)){games.push(game);ids.add(game.id);}
+          games.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+          games=games.slice(0,55);
+        } catch { /* Keep explicit limited-history state. */ }
       }
+      const usesPrevious=games.length>currentGames.length;
+      const seasonsUsed=[...(currentGames.length?[season]:[]),...(usesPrevious?[season-1]:[])];
+      const usedSeason=currentGames.length?season:usesPrevious?season-1:season;
       return {
         player:{...known,sport},
         teammateInjuries:injuryFeed.status==='fulfilled'?reportedTeammateInjuries(injuryFeed.value,eventRosters.filter(p=>p.teamId===known.teamId),id):[],
         nextGame:scheduleFeed.status==='fulfilled'?findUpcomingMatch(scheduleFeed.value,known,now()):null,
         scheduleStatus:scheduleFeed.status==='fulfilled'?'checked':'unavailable',
-        games, season:usedSeason,
-        gamelogStatus:gamelog.status==='fulfilled'?'available':'unavailable',
+        games, season:usedSeason, seasonsUsed, currentSeasonGames:currentGames.length, historyCrossesSeasons:usesPrevious,
+        gamelogStatus:games.length?'available':'unavailable',
         injuries: injuryFeed.status==='fulfilled'?matchInjuries(injuryFeed.value,id,known.name):[],
         injuryStatus:injuryFeed.status==='fulfilled'?'feed-checked':'unavailable',
         // Absence from a third-party feed does not confirm fitness.
         injuriesVerified:false, oddsVerified:false,
-        sources:{gamelog:gamelogUrl.replace('season='+season,'season='+usedSeason),injuries:injuriesUrl,schedule:scheduleUrl},
+        sources:{gamelog:gamelogUrl.replace('season='+season,'season='+usedSeason),...(usesPrevious?{previousGamelog:previousUrl}:{}),injuries:injuriesUrl,schedule:scheduleUrl},
         fetchedAt:new Date(now()).toISOString(), source:SOURCE,
         warnings:[
-          ...(gamelog.status==='rejected'?['Player game logs are unavailable from ESPN.']:[]),
+          ...(gamelog.status==='rejected'?['Current-season game logs are unavailable from ESPN.']:[]),
+          ...(usesPrevious?['Rolling history includes earlier-season games; past roles, rosters and minutes may differ from today.']:[]),
+          ...(games.length<18?['Fewer than 18 dated games: current walk-forward evaluation may be too thin for a research shortlist.']:[]),
           ...(scheduleFeed.status==='rejected'?['Current fixtures could not be verified.']:[]),
           ...(injuryFeed.status==='rejected'?['Injury feed could not be reached.']:['ESPN injury listings are not an official active/inactive confirmation.']),
           ...(sport==='SOCCER'?['Soccer player game logs have limited support; some prop markets cannot be analyzed.']:[])
