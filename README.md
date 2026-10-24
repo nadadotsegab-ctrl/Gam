@@ -323,3 +323,34 @@ not account for all correlations, and cannot promise future wins.
 Current ESPN endpoints remain best-effort and unofficial. Commercial
 redistribution requires checking the provider terms, and operating with a
 free Odds API quota may produce a small or empty Daily Props slate.
+
+## Why Parlay Builder may show only one game
+
+With `ODDS_API_FREE_MODE=1`, UltraX deliberately scans **one upcoming event and
+one prop market per manually triggered request** to conserve your API quota.
+An Over and an Under on the same player/line are **alternatives**, not two parlay
+legs. The Builder now blocks selecting both sides of that exact prop.
+
+Click **Scan first game**, then **Scan next game (uses credits)** to browse
+subsequent chronological events. Each click examines only one additional
+event and may consume more API credits. No automatic league-wide scan is
+performed in free-budget mode. Repeated requests for the same event offset
+reuse the server's short-lived cache. The Builder combines active candidate
+snapshots from different events and hides snapshots after five minutes.
+
+A research shortlist requires at least two **distinct** games with verified
+roster, opponent, price and history; rolling trend agreement; and eight
+earlier walk-forward evaluations. Setting five target legs does **not** create
+five imaginary selections.
+
+### Early-season baseline
+
+If a player has fewer than 18 parseable current-season games, UltraX attempts
+to fetch the **prior season** and extends the research baseline with dated
+games from that season (deduplicated by game ID). Reports clearly label the
+seasons and current-season game count and flag that prior team roles, minutes,
+coaches, and injury context may no longer hold. Missing prior-season data
+remain missing: no replacement is invented.
+
+Historical rolling estimates are **not** calibrated win probabilities and
+cannot establish that a parlay is profitable or safe.
