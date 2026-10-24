@@ -190,7 +190,7 @@ export default function DailyProps({ bankroll, oddsFormat, onTrack, onAnalyze, o
     .sort((a,b)=>sort==='time'? Date.parse(a.startsAt)-Date.parse(b.startsAt) :
   sort==='ev'?b.ev-a.ev :
   (b.research?.sortTier??0)-(a.research?.sortTier??0) ||
-  (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0) || b.ev-a.ev);
+  (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0) || (b.research?.sortSignal??0)-(a.research?.sortSignal??0) || b.ev-a.ev);
   const warnings = selectedSnapshots.flatMap(snapshot => Array.isArray(snapshot.warnings) ? snapshot.warnings.filter(item => typeof item === 'string').map(item => `${sportLabel(snapshot.sport)}: ${item}`) : []);
   const incomplete = selectedSnapshots.some(snapshot => snapshot.complete === false);
   const expired = selectedSnapshots.length > 0 && currentSnapshots.length < selectedSnapshots.length;
