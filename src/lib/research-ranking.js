@@ -71,6 +71,10 @@ export function evaluateResearchEvidence(pick,report,now=Date.now()) {
     add('schedule','Opponent and schedule','missing','Could not independently match the scheduled fixture to this sportsbook event.');
   }
   const games=Array.isArray(report?.games)?report.games:[];
+  if(report?.historyCrossesSeasons){
+    warnings.push('CROSS-SEASON BASELINE: Older game logs were used. Coaching, team role and injury context may have changed.');
+    evidence.push('Current-season recorded games: '+(report.currentSeasonGames??'unknown')+'; remainder from the previous season.');
+  }
   const values=games.map(g=>fetchStat(g,keys)).filter(v=>v!==null);
   const seasonCurrent=Number.isInteger(report?.season) && report.season >= new Date(now).getUTCFullYear()-1;
   const sample=values.length;
