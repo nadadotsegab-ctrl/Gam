@@ -157,7 +157,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     }
     const timestamp = now();
     const warnings = [];
-    if (candidates.length > requested.length && !eventOffset) warnings.push(`Only ${requested.length} upcoming event(s) scanned out of ${candidates.length} to limit provider quota use.`);
+    if (candidates.length > requested.length && !eventOffset) warnings.push(`Only the first ${requested.length} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
     if (eventOffset) warnings.push(`Manual scan from event ${eventOffset + 1} (up to ${requested.length} games), out of ${candidates.length}. Earlier event quotes may expire.`);
     if (failures) warnings.push(`${failures} event scan${failures === 1 ? '' : 's'} failed. Picks cover only the events scanned successfully.`);
     return {
