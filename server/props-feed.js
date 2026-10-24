@@ -77,7 +77,7 @@ function eventCandidates(payload, { providerSport, day, timeZone, timestamp }) {
  * Fetch player props through a server-held key. Only current-day, future events
  * are queried. The returned rankings are market estimates, not model forecasts.
  */
-export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
+export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetchImpl = globalThis.fetch, now = () => Date.now(), researchAssess = null } = {}) {
   const key = typeof apiKey === 'string' ? apiKey.trim() : '';
   const freeMode = process.env.ODDS_API_FREE_MODE === '1';
   const maxEvents = freeMode ? 1 : MAX_EVENTS;
@@ -295,8 +295,25 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       }
       if (!entry) throw new ProviderError('The local date changed during the scan. Refresh to scan the new day.', { status: 503 });
       const { events, expires, ...metadata } = entry;
-      const picks = rankPlayerProps(events, { sport, now: now(), timeZone, minEdge: 0, maxAgeMinutes: 15 });
-      json(res, 200, { ...metadata, picks });
+      const rawPicks = rankPlayerProps(events, { sport, now: now(), timeZone, minEdge: 0, maxAgeMinutes: 15 });
+      let picks = rawPicks;
+      let researchNote='No calibrated player model is installed. Price discrepancies are not bets.';
+      if(typeof researchAssess==='function' && rawPicks.length) {
+        try {
+          const inspected=await researchAssess(rawPicks);
+          picks=rawPicks.map((pick,i)=>({...pick,research:inspected?.[i]||{
+            status:'NOT CHECKED',verifiedChecks:0,totalChecks:9,sortTier:0,warnings:['Research coverage limit reached.']
+          }}));
+          researchNote='These are research candidates, not predictions. Missing injuries, role, defensive metrics or calibrated probabilities prevent automatic betting recommendations.';
+        } catch {
+          picks=rawPicks.map(pick=>({...pick,research:{status:'RESEARCH UNAVAILABLE',sortTier:0,verifiedChecks:0,totalChecks:9,warnings:['Could not verify player statistics or rosters.']}}));
+          researchNote='Research sources are temporarily unavailable. No selections are approved.';
+        }
+      }
+      picks=[...picks].sort((a,b)=>(b.research?.sortTier??0)-(a.research?.sortTier??0)||
+        (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0)||b.ev-a.ev);
+      json(res, 200, { ...metadata, picks, researchNote, researchEvaluated:picks.filter(p=>p.research).length,
+        fullyValidatedRecommendations:0 });
     } catch (error) {
       json(res, error instanceof ProviderError ? error.status : 502, {
         error: error instanceof ProviderError ? error.message : 'Daily player props are temporarily unavailable. Try again shortly.',

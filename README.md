@@ -220,3 +220,39 @@ event and one player market; many legitimate queries will return no qualifying
 positive-EV prop. The manual builder works independently. **Neither workflow
 is an injury-aware or statistically validated predictive model**, and no
 parlay win probability is claimed.
+
+## Research-first Daily Props and parlay screening
+
+Daily Props retains live cross-book prices, but **no longer ranks props by price discrepancy alone**.
+The server now enriches up to 12 candidates per scan with the public ESPN roster,
+game-log, injury-listing and schedule feeds. The UI places candidates with more
+verified evidence first and displays an evidence checklist in **View prop**.
+An event/roster mismatch is marked **BLOCKED** and is excluded from automatic
+parlay shortlists.
+
+Research currently checks:
+- Athlete's available team roster against both teams in the sportsbook matchup
+- Exact prop market game logs, last 5/10/20 historical hit counts and averages
+- ESPN's upcoming fixture and the approximate days since last recorded game
+- Available player and teammate injury listings, with explicit gaps when no official
+  injury clearance or full lineup is available
+- Current event/line/quote timestamps and independent sportsbook references
+
+**Not yet verified/modelled:** official game-day active/inactive confirmations,
+expected rotations and minutes, teammate usage effects, opponent defensive
+efficiency, current play-by-play matchup models, calibrated over/under
+probabilities, or joint parlay probabilities. These are named as missing rather
+than treated as neutral or assumed favorable. Historical frequency and bookmaker
+no-vig consensus do **not** constitute model win probabilities. No bet
+automatically receives an OVER/UNDER recommendation until an independently
+validated model and verified inputs are connected.
+
+Parlay Builder's *Suggest research shortlist* selects from candidates with
+verified matchup roster, fresh price, historical form and verified fixture only.
+It avoids repeating the same event, and will decline to generate a shortlist
+when too few different games have the required evidence. This is a research
+shortlist, never a validated multi-leg wager or a promised winner.
+
+The ESPN endpoints are unofficial and may rate limit or return incomplete data.
+The review report provides source links and explicit statuses. Validate
+production/commercial licensing before distributing fetched data publicly.
