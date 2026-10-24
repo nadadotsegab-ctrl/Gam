@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Search, Activity, AlertTriangle, ArrowRight, RefreshCw, ShieldCheck, Layers3, ExternalLink } from 'lucide-react';
 import { summarizeGames, evaluateProp } from '../lib/research.js';
+import { projectValues } from '../lib/forecast.js';
 import { americanToDecimal, decimalToAmerican } from '../lib/odds.js';
 import ManualSlip from './ManualSlip.jsx';
 
@@ -29,6 +30,7 @@ function PlayerResearch({initialSearch}) {
  const validLine=line.trim()!=='' && Number.isFinite(Number(line)) && Number(line)>=0;
  const values=logs.map(g=>g.metric);
  const analysis=useMemo(()=>evaluateProp({values,line:validLine?Number(line):NaN,odds:Number(odds)}),[report,market,line,odds]);
+ const forecast=useMemo(()=>projectValues(logs.map(g=>({id:g.id,date:g.date,values:{stat:g.metric,minutes:g.values?.minutes}})),['stat'],{line:validLine?Number(line):null}),[report,market,line]);
  const history=validLine ? analysis.history : null;
  const last=history?.last10;
  const sampleCount=logs.length;
@@ -83,6 +85,22 @@ function PlayerResearch({initialSearch}) {
       <Summary title="Last 10 over line" value={last?last.over+'/'+last.games:'—'} subtitle={last?'Historical rate '+percent(last.over/last.games):'No matching stats'}/>
       <Summary title="Odds break-even rate" value={percent(analysis.breakEven)} subtitle="From user-entered odds, not model confidence"/>
     </div>
+    
+    <section className="research-subpanel">
+      <h3>Independent rolling forecast (exploratory)</h3>
+      {forecast.ready ? <>
+        <div className="forecast-preview">
+          <div><span>Rolling estimate</span><strong>{fmt(forecast.projection)}</strong></div>
+          <div><span>Line comparison</span><strong>{forecast.lean.replaceAll('_',' ')}</strong></div>
+          <div><span>L5 / L20 average</span><strong>{fmt(forecast.observed.avg5)} / {fmt(forecast.observed.avg20)}</strong></div>
+          <div><span>Walk-forward absolute error</span><strong>{forecast.walkForward.mae===null?'Not enough games':fmt(forecast.walkForward.mae)}</strong></div>
+        </div>
+        <p>Projection uses recent averages, a robust median, and recency-weighting. Walk-forward scoring uses only earlier games to predict later games. Neither is a calibrated probability or a bet recommendation.</p>
+        <p>Recent median: {fmt(forecast.observed.median10)} · Historical game-to-game volatility: {fmt(forecast.observed.volatility)} · Trend versus L20: {fmt(forecast.observed.streak)}</p>
+        {forecast.observed.minutes && <p>Observed minutes, last 5: {fmt(forecast.observed.minutes.last5)}, baseline: {fmt(forecast.observed.minutes.last20)}. Future minutes remain unverified.</p>}
+        {forecast.notes.map((note,i)=><p key={i} className="research-muted">• {note}</p>)}
+      </>:<p className="research-warning">{forecast.reason}</p>}
+    </section>
     <section className="research-subpanel"><h3>Game-by-game results</h3><p>Season {report.season}. Latest available games first. These are historical results, not a forecast.</p>
       {logs.length?<div className="research-table-wrap"><table className="research-table"><thead><tr><th>Date</th><th>Opponent</th><th>{market}</th><th>Line result</th></tr></thead><tbody>{logs.slice(0,20).map(g=><tr key={g.id}><td>{g.date?new Date(g.date).toLocaleDateString():'Date unknown'}</td><td>{g.opponent||'—'}</td><td>{g.metric}</td><td>{!validLine?'—':g.metric>Number(line)?'Over':g.metric<Number(line)?'Under':'Push'}</td></tr>)}</tbody></table></div>:<p className="research-warning">No parseable {market.toLowerCase()} game logs were returned. This market cannot be analyzed from the current source.</p>}
     </section>
@@ -115,7 +133,7 @@ function ParlayBuilder({importedMarkets=[]}){
  const [sport,setSport]=useState('NBA'),[target,setTarget]=useState(3),[available,setAvailable]=useState([]),[selected,setSelected]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[fetched,setFetched]=useState('');
  const [provider,setProvider]=useState({checking:true,configured:false,freeMode:false});
  useEffect(()=>{const controller=new AbortController();fetch('/api/props/status',{signal:controller.signal}).then(r=>r.ok?r.json():Promise.reject(new Error('Odds service unavailable'))).then(data=>setProvider({checking:false,configured:Boolean(data.configured),freeMode:Boolean(data.freeMode)})).catch(()=>{if(!controller.signal.aborted)setProvider({checking:false,configured:false,freeMode:false});});return()=>controller.abort();},[]);
- const hasBasicResearch=pick=>pick?.research?.status==='RESEARCH INCOMPLETE' &&
+ const hasBasicResearch=pick=>pick?.research?.status==='RESEARCH INCOMPLETE' && pick.research?.agreement==='AGREES' && (pick.research.forecast?.walkForward?.testGames||0)>=8 &&
   ['roster','odds','form','schedule'].every(id=>pick.research.checks?.some(c=>c.id===id&&c.status==='verified'));
  const readyCandidates=available.filter(hasBasicResearch);
  const chosen=available.filter(p=>selected.includes(p.id));
@@ -146,7 +164,7 @@ function ParlayBuilder({importedMarkets=[]}){
    else setError('Research shortlist only — historical stats and matchups were checked, but injury availability, expected minutes, opponent defense and calibrated probabilities remain missing. NOT a betting recommendation.');
  }
  return <div className="research-shell">
-  <section className="research-hero"><div><div className="eyebrow">PARLAY RESEARCH</div><h2>Compare real prices.<br/><span>Understand combined risk.</span></h2><p>Only research-screened candidates may appear in a preliminary shortlist; unresolved lineups, injury news, and probability calibration are displayed as risks.</p></div><Layers3 size={34}/></section>
+  <section className="research-hero"><div><div className="eyebrow">PARLAY RESEARCH</div><h2>Compare real prices.<br/><span>Understand combined risk.</span></h2><p>Only research-screened candidates whose trend and market signals agree can enter a preliminary shortlist; unresolved lineups, injury news, and probability calibration are displayed as risks.</p></div><Layers3 size={34}/></section>
   <section className="research-panel">
    <div className="research-panel-heading"><h2>Optional: live sportsbook prop candidates</h2><p>Requires a server-side ODDS_API_KEY and a plan covering player props. You can use the calculator below without a key.</p></div>
    {!provider.checking&&!provider.configured && <div className="research-warning"><AlertTriangle size={16}/>No sportsbook feed is connected. To enable live props, <a href="https://the-odds-api.com/" target="_blank" rel="noreferrer">create your own API key</a> and set ODDS_API_KEY in your server environment (not browser or GitHub). Restart or redeploy the server afterward. Meanwhile, build a manual slip below.</div>}
@@ -163,7 +181,7 @@ function ParlayBuilder({importedMarkets=[]}){
    {available.length>0 && <div className="research-candidates">
      {available.slice(0,32).map(p=><label key={p.id} className="research-candidate">
        <input type="checkbox" checked={selected.includes(p.id)} disabled={p.research?.status==='BLOCKED'||(!selected.includes(p.id)&&selected.length>=8)} onChange={e=>setSelected(old=>e.target.checked?[...old,p.id]:old.filter(id=>id!==p.id))}/>
-       <span><strong>{p.player} — {p.side} {p.line} {p.marketLabel||p.marketKey}</strong><small>{p.event} · {p.book} · {p.odds>0?'+':''}{p.odds} · market price discrepancy {p.ev.toFixed(1)}%</small><small><strong>Research: {p.research?.status||'NOT CHECKED'}</strong> · {p.research?.verifiedChecks??0}/{p.research?.totalChecks??9} checks · {p.research?.historical?.last10?.games ? 'Last '+p.research.historical.last10.games+' game avg '+p.research.historical.last10.average.toFixed(1) : 'No usable game logs'}</small>{(p.research?.warnings||[]).slice(0,2).map((w,i)=><small key={i} className="research-candidate-warning">{w}</small>)}</span>
+       <span><strong>{p.player} — {p.side} {p.line} {p.marketLabel||p.marketKey}</strong><small>{p.event} · {p.book} · {p.odds>0?'+':''}{p.odds} · market price discrepancy {p.ev.toFixed(1)}%</small><small><strong>Research: {p.research?.status||'NOT CHECKED'}</strong> · {p.research?.verifiedChecks??0}/{p.research?.totalChecks??9} checks · {p.research?.historical?.last10?.games ? 'Last '+p.research.historical.last10.games+' game avg '+p.research.historical.last10.average.toFixed(1) : 'No usable game logs'}</small>{p.research?.forecast?.ready && <small>Projection {p.research.forecast.projection} · {p.research.agreement==='AGREES'?'Signals agree':p.research.agreement==='DISAGREES'?'Signals disagree':'Unclear'}</small>}{(p.research?.warnings||[]).slice(0,2).map((w,i)=><small key={i} className="research-candidate-warning">{w}</small>)}</span>
      </label>)}
    </div>}
   </section>
