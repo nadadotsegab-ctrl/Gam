@@ -220,6 +220,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         requiresPlayerPropPlan: true,
         cacheSeconds: CACHE_MS / 1000,
         maxEvents,
+        maxManualBatchEvents: freeMode ? 5 : 12,
+        researchModeSupported: true,
         freeMode,
         method: METHOD,
         minReferences: 2,
