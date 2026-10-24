@@ -256,3 +256,70 @@ shortlist, never a validated multi-leg wager or a promised winner.
 The ESPN endpoints are unofficial and may rate limit or return incomplete data.
 The review report provides source links and explicit statuses. Validate
 production/commercial licensing before distributing fetched data publicly.
+
+
+## Independent rolling forecast workbench and historical validation
+
+UltraX now includes an **original** feature/forecast workbench inspired by the
+*architecture ideas* discussed in [Sports-EV-Bot](https://github.com/DevanshDaxini/Sports-EV-Bot).
+That upstream repository currently does not publish a LICENSE file; **no upstream
+implementation, datasets, trained models, or credentials were copied**. Its
+self-reported accuracy is not presented as independently verified UltraX accuracy.
+
+### Added for NBA/NFL/soccer research
+
+- League-specific market parsing based on UltraX's existing verified game logs.
+- Rolling last-5/10/20 means, last-10 median, longer-term average and
+  exponential recency weighting, plus volatility and consistency indicators.
+- An interpretable *heuristic projection* in the same stat units as the market;
+  its trend is independently compared with the book's quoted side.
+- Observed minutes trend, flagged injuries, teammate availability, rest,
+  matchup/team identity, source links, bookmaker disagreement and missing
+  defensive/pace/rotation features.
+- Strictly time-ordered game-log handling and an expanding-window one-game-ahead
+  MAE, calculated only when enough earlier games are available.
+- Preliminary parlay shortlists require both price and historical trend signals
+  to agree, 8+ walk-forward comparisons, sufficient recent data, and validated
+  player/fixture records. Otherwise UltraX withholds the shortlist.
+
+**Important distinction:** The rolling score is NOT a fitted XGBoost,
+LightGBM, or calibrated probability model. The optional backtester reports
+error and research-only realized historical ROI from authentic pregame lines.
+**No projected 60%, 80% or 90% winning chances are fabricated**. Whether a
+shortlist is profitable cannot be established without historical *real*
+sportsbook quotes, their timestamps, a held-out test, and verified pregame
+context (especially injury reports).
+
+### Run your own walk-forward audit ($0, Node.js only)
+
+Provide a historical CSV from a source you are licensed to use, with these
+columns:
+
+\`\`\`text
+event_time,sport,player,market,actual,line,offered_side,american_odds,quoted_at,source_url
+\`\`\`
+
+Each row is ONE settled player game/market. **event_time** is the game's
+actual start time, **quoted_at** is when the price was available before the
+start, and \`actual\` is known only after the game. Use ISO 8601 timestamps.
+Game data are always processed in chronological order, grouped by player and
+market; each projection sees only earlier games. Duplicate player-market games
+are skipped. A missing/late quoted price or missing HTTPS evidence source
+excludes the row from betting-result statistics, though it may still be
+used as a historical game result. Do **not** fake past odds/lines, synthesize
+actual bets from final box scores, or interpret proxy lines as true historical
+sportsbook returns.
+
+\`\`\`bash
+node scripts/backtest-props.mjs /path/to/authorized-historical-props.csv > backtest.json
+\`\`\`
+
+The output includes a final-30%-of-dates holdout MAE, number of verified quote
+examples, observed win/loss/push counts where the historical projection agrees
+with the offered side, and realized unit-return ROI where possible. This is
+exploratory research; it does not train a calibrated probability model, does
+not account for all correlations, and cannot promise future wins.
+
+Current ESPN endpoints remain best-effort and unofficial. Commercial
+redistribution requires checking the provider terms, and operating with a
+free Odds API quota may produce a small or empty Daily Props slate.
