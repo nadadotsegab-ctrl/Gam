@@ -102,7 +102,7 @@ function PlayerResearch({initialSearch}) {
         {forecast.notes.map((note,i)=><p key={i} className="research-muted">• {note}</p>)}
       </>:<p className="research-warning">{forecast.reason}</p>}
     </section>
-    <section className="research-subpanel"><h3>Game-by-game results</h3><p>Season {report.season}. Latest available games first. These are historical results, not a forecast.</p>
+    <section className="research-subpanel"><h3>Game-by-game results</h3><p>Seasons {report.seasonsUsed?.join(" + ")||report.season}. Latest available games first. These are historical results, not a forecast.</p>{report.historyCrossesSeasons && <p className="research-warning">Some games come from an earlier season. Current-season games: {report.currentSeasonGames}. Do not assume the player has the same minutes, role or teammates as last season.</p>}
       {logs.length?<div className="research-table-wrap"><table className="research-table"><thead><tr><th>Date</th><th>Opponent</th><th>{market}</th><th>Line result</th></tr></thead><tbody>{logs.slice(0,20).map(g=><tr key={g.id}><td>{g.date?new Date(g.date).toLocaleDateString():'Date unknown'}</td><td>{g.opponent||'—'}</td><td>{g.metric}</td><td>{!validLine?'—':g.metric>Number(line)?'Over':g.metric<Number(line)?'Under':'Push'}</td></tr>)}</tbody></table></div>:<p className="research-warning">No parseable {market.toLowerCase()} game logs were returned. This market cannot be analyzed from the current source.</p>}
     </section>
     <section className="research-subpanel"><h3>Upcoming opponent and rest</h3>
@@ -123,7 +123,7 @@ function PlayerResearch({initialSearch}) {
       {last ? 'In the last '+last.games+' recorded games, '+last.over+' finished above '+line+'. ' : ''}
       This is NOT a prediction of today's result. A calibrated model plus verified current odds, injuries, rotations and matchup data are required before recommending a bet.</p>
       {invalidSeason && <p className="research-warning">Only an older season was available. Do not use it as today's form.</p>}
-      <div className="research-sources">Sources: <a href={report.sources.gamelog} target="_blank" rel="noreferrer">Game log <ExternalLink size={12}/></a><a href={report.sources.injuries} target="_blank" rel="noreferrer">Injury feed <ExternalLink size={12}/></a></div>
+      <div className="research-sources">Sources: <a href={report.sources.gamelog} target="_blank" rel="noreferrer">Game log <ExternalLink size={12}/></a><a href={report.sources.injuries} target="_blank" rel="noreferrer">Injury feed <ExternalLink size={12}/></a>{report.sources.previousGamelog && <a href={report.sources.previousGamelog} target="_blank" rel="noreferrer">Previous season <ExternalLink size={12}/></a>}</div>
       {(report.warnings||[]).map((w,i)=><p className="research-muted" key={i}>⚠ {w}</p>)}
     </section>
    </>}
