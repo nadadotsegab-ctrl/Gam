@@ -77,9 +77,9 @@ function eventCandidates(payload, { providerSport, day, timeZone, timestamp }) {
  * Fetch player props through a server-held key. Only current-day, future events
  * are queried. The returned rankings are market estimates, not model forecasts.
  */
-export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetchImpl = globalThis.fetch, now = () => Date.now(), researchAssess = null } = {}) {
+export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetchImpl = globalThis.fetch, now = () => Date.now(), researchAssess = null, freeBudget = process.env.ODDS_API_FREE_MODE === '1' } = {}) {
   const key = typeof apiKey === 'string' ? apiKey.trim() : '';
-  const freeMode = process.env.ODDS_API_FREE_MODE === '1';
+  const freeMode = Boolean(freeBudget);
   const maxEvents = freeMode ? 1 : MAX_EVENTS;
   const cache = new Map();
   const pending = new Map();
@@ -114,10 +114,10 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
   }
 
-  async function load({ sport, providerSport, league, timeZone, day }) {
+  async function load({ sport, providerSport, league, timeZone, day, eventOffset = 0 }) {
     const listed = await upstream(`/v4/sports/${providerSport}/events/`);
     const candidates = eventCandidates(listed, { providerSport, day, timeZone, timestamp: now() });
-    const requested = candidates.slice(0, maxEvents);
+    const requested = candidates.slice(eventOffset, eventOffset + maxEvents);
     const responses = [];
     let cursor = 0;
     let failures = 0;
@@ -157,7 +157,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     }
     const timestamp = now();
     const warnings = [];
-    if (candidates.length > maxEvents) warnings.push(`Only the first ${maxEvents} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
+    if (candidates.length > maxEvents && !eventOffset) warnings.push(`Only the first ${maxEvents} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
+    if (eventOffset) warnings.push(`Manual scan of event ${eventOffset + 1} out of ${candidates.length}. Earlier event quotes may expire.`);
     if (failures) warnings.push(`${failures} event scan${failures === 1 ? '' : 's'} failed. Picks cover only the events scanned successfully.`);
     return {
       events: responses,
@@ -172,6 +173,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       eventsScanned: responses.length,
       eventsRequested: requested.length,
       eventsAvailable: candidates.length,
+      eventOffset,
       complete: failures === 0 && requested.length === candidates.length,
       warnings,
       method: METHOD,
@@ -180,7 +182,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
   }
 
   async function entryFor(options) {
-    const cacheKey = [options.sport, options.league || '', options.timeZone, options.day].join('|');
+    const cacheKey = [options.sport, options.league || '', options.timeZone, options.day, options.eventOffset || 0].join('|');
     const existing = cache.get(cacheKey);
     if (existing && existing.expires > now()) {
       retain(cacheKey, existing);
@@ -284,12 +286,21 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       json(res, 503, { error: 'Player props need ODDS_API_KEY and a provider plan with event/player-prop access.' });
       return true;
     }
+    // Free-plan browsing supports ONE additional event only after a deliberate
+    // user click. No automatic sweep of all games or arbitrary batch sizes.
+    const offsetRaw=url.searchParams.get('eventOffset');
+    const eventOffset=offsetRaw===null?0:/^(0|[1-9]\d?)$/.test(offsetRaw)?Number(offsetRaw):NaN;
+    if(!Number.isInteger(eventOffset) || eventOffset<0 || eventOffset>24 || (!freeMode&&eventOffset!==0)){
+      json(res,400,{error:'Event offset must be 0–24 and is available only in free-budget mode.'});
+      return true;
+    }
+
     const providerSport = league || PROP_SPORTS[sport];
     try {
       let entry;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const day = localDateKey(now(), timeZone);
-        entry = await entryFor({ sport, providerSport, league, timeZone, day });
+        entry = await entryFor({ sport, providerSport, league, timeZone, day, eventOffset });
         if (entry.day === localDateKey(now(), timeZone)) break;
         entry = undefined;
       }
