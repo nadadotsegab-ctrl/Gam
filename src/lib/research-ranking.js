@@ -4,6 +4,7 @@
  * All conclusions are transparent descriptions of observed data.
  */
 import { summarizeGames } from './research.js';
+import { projectMarket, directionAgreement } from './forecast.js';
 
 export const PROP_STAT_FIELDS=Object.freeze({
   NBA:Object.freeze({
@@ -88,6 +89,23 @@ export function evaluateResearchEvidence(pick,report,now=Date.now()) {
     if(sideRate < .5) warnings.push('Recent results lean against the quoted selection ('+hit+'/'+n+').');
     if(sideRate >= .7) evidence.push('Recent results lean toward the selected side, but sample sizes are small.');
   }
+  const forecast=projectMarket(games,keys,pick?.line,pick?.startsAt);
+  const agreement=directionAgreement(pick,forecast);
+  add('forecast','Independent statistical trend baseline',
+      forecast.ready?'verified':'missing',
+      forecast.ready
+        ? 'Rolling projection '+forecast.projection+' vs line '+pick.line+'; '+forecast.lean+'. This is an uncalibrated baseline, NOT a win probability.'
+        : forecast.reason);
+  if(forecast.ready){
+    evidence.push('Rolling baseline projects '+forecast.projection+' with '+forecast.lean+' versus the listed line '+pick.line+'.');
+    if(agreement==='DISAGREES') warnings.push('RECENT FORM DISAGREES with the price-based selection. Do not treat market EV alone as endorsement.');
+    if(agreement==='MIXED_OR_UNCERTAIN') warnings.push('Trend projection is close to the line; no clear descriptive signal.');
+    if(forecast.walkForward?.mae!==null && forecast.walkForward?.mae!==undefined) {
+      evidence.push('One-game-ahead walk-forward baseline MAE: '+forecast.walkForward.mae+
+        ' across '+forecast.walkForward.testGames+' past games. Not an actual sportsbook-backtest result.');
+    }
+    if(forecast.observed?.minutes?.delta < -3) warnings.push('Observed minutes decreased; projected role remains uncertain.');
+  }
   const injured=Array.isArray(report?.injuries)?report.injuries:[];
   const risk=injured.find(i=>/\b(out|doubtful|questionable|injured|day.to.day|inactive|suspended)\b/i.test(i.status||''));
   if(risk) {
@@ -130,16 +148,18 @@ export function evaluateResearchEvidence(pick,report,now=Date.now()) {
   return {
     status,verifiedChecks:verified,totalChecks:checks.length,researchCoverage:Math.round(100*verified/checks.length),
     checks, evidence, warnings, missingChecks:missing, riskChecks:blockers,
-    historical:summary, sampleCount:sample, nextOpponent:next?.opponent||null, injuryFlag:risk?.status||null,
+    historical:summary, sampleCount:sample, forecast, agreement, nextOpponent:next?.opponent||null, injuryFlag:risk?.status||null,
     sources:report?.sources||{},lastChecked:report?.fetchedAt||null,
     modelProbability:null, predictedValue:null, recommendation:null,
     // For UI ordering only: number of research checks completed, not confidence.
     sortTier:blocked?0:validHistory?2:1,
+    sortSignal:agreement==='AGREES'?2:agreement==='MIXED_OR_UNCERTAIN'?1:0,
   };
 }
 export function sortByEvidence(picks) {
  return [...picks].sort((a,b)=>
    (b.research?.sortTier??0)-(a.research?.sortTier??0)||
    (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0)||
+   (b.research?.sortSignal??0)-(a.research?.sortSignal??0)||
    Date.parse(a.startsAt)-Date.parse(b.startsAt));
 }
