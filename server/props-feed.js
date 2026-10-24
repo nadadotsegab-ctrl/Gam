@@ -311,7 +311,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         }
       }
       picks=[...picks].sort((a,b)=>(b.research?.sortTier??0)-(a.research?.sortTier??0)||
-        (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0)||b.ev-a.ev);
+        (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0)||
+        (b.research?.sortSignal??0)-(a.research?.sortSignal??0)||b.ev-a.ev);
       json(res, 200, { ...metadata, picks, researchNote, researchEvaluated:picks.filter(p=>p.research).length,
         fullyValidatedRecommendations:0 });
     } catch (error) {

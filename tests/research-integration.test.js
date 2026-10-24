@@ -59,6 +59,9 @@ test('live prop scanner attaches game logs and roster evidence, while not invent
   assert.equal(payload.picks[0].research.checks.find(x=>x.id==='schedule').status,'verified');
   assert.equal(payload.picks[0].research.historical.last5.games,5);
   assert.equal(payload.picks[0].research.modelProbability,null);
+  assert.equal(payload.picks[0].research.forecast.ready,false);
+  assert.equal(payload.picks[0].research.agreement,'NOT_AVAILABLE');
+  assert.equal(payload.picks[0].research.forecast.reason.includes('10 dated previous games'),true);
   assert.equal(payload.fullyValidatedRecommendations,0);
   assert.ok(callCount>=7);
  } finally {await new Promise(resolve=>server.close(resolve));}
