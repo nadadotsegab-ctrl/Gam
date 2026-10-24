@@ -12,7 +12,7 @@ test('early-season research identifies and labels prior-season baseline instead 
  const mock=async url=>{
    const u=new URL(url);
    if(u.pathname.endsWith('/teams'))return Response.json({sports:[{leagues:[{teams:[{team:{id:'1',displayName:'Denver Nuggets'}}]}]}]});
-   if(u.pathname.endsWith('/teams/1/roster'))return Response.json({athletes:[{id:'111',displayName:'Example Player'}]});
+   if(u.pathname.endsWith('/teams/1/roster'))return Response.json({athletes:[{id:'999011',displayName:'Example Player'}]});
    if(u.pathname.endsWith('/gamelog')){
      const season=u.searchParams.get('season');
      if(season==='2027')return Response.json(logs(5,'current',Date.parse('2026-10-22T20:00:00Z')));
@@ -27,7 +27,7 @@ test('early-season research identifies and labels prior-season baseline instead 
  const server=http.createServer((req,res)=>{Promise.resolve(handler(req,res)).catch(e=>{res.statusCode=500;res.end(e.message)})});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  try{
-  const url='http://127.0.0.1:'+server.address().port+'/api/research/player?sport=NBA&id=111&name=Example%20Player';
+  const url='http://127.0.0.1:'+server.address().port+'/api/research/player?sport=NBA&id=999011&name=Example%20Player';
   const response=await fetch(url);
   assert.equal(response.status,200);
   const report=await response.json();
