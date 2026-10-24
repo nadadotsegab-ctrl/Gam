@@ -107,7 +107,21 @@ export function evaluateResearchEvidence(pick,report,now=Date.now()) {
     if(restDays<=1) warnings.push('Short rest interval; effect on performance has not been quantified.');
   } else add('rest','Rest and game spacing','missing','Rest could not be verified from dated game logs.');
   add('defense','Opponent defensive matchup','missing','Opponent defensive efficiency/position matchups are not connected yet.');
-  add('minutes','Expected playing time and role','missing','Expected minutes, lineup assignment and usage changes are not modeled.');
+  const playedMinutes=games.map(g=>Number.isFinite(g?.values?.minutes)?g.values.minutes:
+    Number.isFinite(g?.values?.min)?g.values.min:null).filter(n=>n!==null&&n>=0&&n<=65);
+  if(playedMinutes.length>=5){
+    const mean=arr=>arr.reduce((a,b)=>a+b,0)/arr.length;
+    const last5=mean(playedMinutes.slice(0,5));
+    const ten=mean(playedMinutes.slice(0,Math.min(10,playedMinutes.length)));
+    add('minutes','Observed playing-time trend','verified',
+      'Last 5 observed minutes: '+readable(last5)+' per game; recent baseline: '+readable(ten)+'. Future minutes NOT verified.');
+    evidence.push('Recent playing time: '+readable(last5)+' minutes per game (observed, not projected).');
+    if(playedMinutes.length>=10 && last5<ten-3)
+      warnings.push('Observed minutes have fallen relative to the 10-game baseline. Check rotations and restrictions.');
+  } else add('minutes','Expected playing time and role','missing','Playing-time logs, projected minutes and rotations not available.');
+  add('defensiveContext','Opponent defensive tendencies','missing','Opponent points allowed by position and defensive efficiency are not connected.');
+  add('gameEnvironment','Game spread and pace','missing','Total, spread, pace, and blowout risk are not connected to this prop.');
+
   const verified=checks.filter(c=>c.status==='verified').length;
   const missing=checks.filter(c=>c.status==='missing').length;
   const blockers=checks.filter(c=>['blocked','warning'].includes(c.status)).length;
