@@ -114,10 +114,10 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
   }
 
-  async function load({ sport, providerSport, league, timeZone, day, eventOffset = 0 }) {
+  async function load({ sport, providerSport, league, timeZone, day, eventOffset = 0, eventCount = 1, market = null }) {
     const listed = await upstream(`/v4/sports/${providerSport}/events/`);
     const candidates = eventCandidates(listed, { providerSport, day, timeZone, timestamp: now() });
-    const requested = candidates.slice(eventOffset, eventOffset + maxEvents);
+    const requested = candidates.slice(eventOffset, eventOffset + (freeMode ? eventCount : maxEvents));
     const responses = [];
     let cursor = 0;
     let failures = 0;
@@ -130,7 +130,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         try {
           const detail = await upstream(`/v4/sports/${providerSport}/events/${encodeURIComponent(event.id)}/odds/`, {
             ...(freeMode ? { regions: 'us' } : { bookmakers: BOOKMAKERS }),
-            markets: Object.keys(PROP_MARKETS[sport]).slice(0, freeMode ? 1 : undefined).join(','),
+            markets: freeMode ? market : Object.keys(PROP_MARKETS[sport]).join(','),
             oddsFormat: 'american',
             dateFormat: 'iso',
           });
@@ -157,8 +157,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
     }
     const timestamp = now();
     const warnings = [];
-    if (candidates.length > maxEvents && !eventOffset) warnings.push(`Only the first ${maxEvents} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
-    if (eventOffset) warnings.push(`Manual scan of event ${eventOffset + 1} out of ${candidates.length}. Earlier event quotes may expire.`);
+    if (candidates.length > requested.length && !eventOffset) warnings.push(`Only the first ${requested.length} upcoming events were scanned out of ${candidates.length} to limit provider quota use.`);
+    if (eventOffset) warnings.push(`Manual scan from event ${eventOffset + 1} (up to ${requested.length} games), out of ${candidates.length}. Earlier event quotes may expire.`);
     if (failures) warnings.push(`${failures} event scan${failures === 1 ? '' : 's'} failed. Picks cover only the events scanned successfully.`);
     return {
       events: responses,
@@ -174,6 +174,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       eventsRequested: requested.length,
       eventsAvailable: candidates.length,
       eventOffset,
+      eventCount:requested.length,
       complete: failures === 0 && requested.length === candidates.length,
       warnings,
       method: METHOD,
@@ -182,7 +183,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
   }
 
   async function entryFor(options) {
-    const cacheKey = [options.sport, options.league || '', options.timeZone, options.day, options.eventOffset || 0].join('|');
+    const cacheKey = [options.sport, options.league || '', options.timeZone, options.day, options.eventOffset || 0,options.eventCount||1,options.market||''].join('|');
     const existing = cache.get(cacheKey);
     if (existing && existing.expires > now()) {
       retain(cacheKey, existing);
@@ -219,6 +220,8 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
         requiresPlayerPropPlan: true,
         cacheSeconds: CACHE_MS / 1000,
         maxEvents,
+        maxManualBatchEvents: freeMode ? 5 : 12,
+        researchModeSupported: true,
         freeMode,
         method: METHOD,
         minReferences: 2,
@@ -295,18 +298,31 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       return true;
     }
 
+    const market = url.searchParams.get('market') || Object.keys(PROP_MARKETS[sport])[0];
+    if(!Object.hasOwn(PROP_MARKETS[sport],market) || (!freeMode&&url.searchParams.has('market'))){
+      json(res,400,{error:'Select a supported player-prop market in free-budget mode.'});return true;
+    }
+    const countRaw=url.searchParams.get('eventCount');
+    const eventCount=countRaw===null?1:/^[1-5]$/.test(countRaw)?Number(countRaw):NaN;
+    if(!Number.isInteger(eventCount) || (eventCount!==1&&!freeMode)){
+      json(res,400,{error:'Select 1 to 5 games in free-budget mode.'});return true;
+    }
+    const researchMode=url.searchParams.get('mode')==='research';
+    if(url.searchParams.has('mode') && !['research','value'].includes(url.searchParams.get('mode'))){
+      json(res,400,{error:'Mode must be research or value.'});return true;
+    }
     const providerSport = league || PROP_SPORTS[sport];
     try {
       let entry;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const day = localDateKey(now(), timeZone);
-        entry = await entryFor({ sport, providerSport, league, timeZone, day, eventOffset });
+        entry = await entryFor({ sport, providerSport, league, timeZone, day, eventOffset, eventCount, market });
         if (entry.day === localDateKey(now(), timeZone)) break;
         entry = undefined;
       }
       if (!entry) throw new ProviderError('The local date changed during the scan. Refresh to scan the new day.', { status: 503 });
       const { events, expires, ...metadata } = entry;
-      const rawPicks = rankPlayerProps(events, { sport, now: now(), timeZone, minEdge: 0, maxAgeMinutes: 15 });
+      const rawPicks = rankPlayerProps(events, { sport, now: now(), timeZone, minEdge: 0, maxAgeMinutes: 15, includeNonPositive: researchMode });
       let picks = rawPicks;
       let researchNote='No calibrated player model is installed. Price discrepancies are not bets.';
       if(typeof researchAssess==='function' && rawPicks.length) {
@@ -324,7 +340,7 @@ export function createPropsApiHandler({ apiKey = process.env.ODDS_API_KEY, fetch
       picks=[...picks].sort((a,b)=>(b.research?.sortTier??0)-(a.research?.sortTier??0)||
         (b.research?.verifiedChecks??0)-(a.research?.verifiedChecks??0)||
         (b.research?.sortSignal??0)-(a.research?.sortSignal??0)||b.ev-a.ev);
-      json(res, 200, { ...metadata, picks, researchNote, researchEvaluated:picks.filter(p=>p.research).length,
+      json(res, 200, { ...metadata, picks, marketScanned: freeMode ? market : 'all', mode: researchMode ? 'research':'value', researchNote, researchEvaluated:picks.filter(p=>p.research).length,
         fullyValidatedRecommendations:0 });
     } catch (error) {
       json(res, error instanceof ProviderError ? error.status : 502, {

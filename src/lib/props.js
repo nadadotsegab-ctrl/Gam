@@ -188,7 +188,7 @@ export function rankPlayerProps(events, options = {}) {
           const fairProbability = references.reduce((sum, pair) => sum + pair.probability[index], 0) / references.length;
           const odds = index === 0 ? target.over : target.under;
           const ev = expectedValue(odds, fairProbability);
-          if (!Number.isFinite(ev) || ev <= 1e-9 || ev + 1e-9 < context.minEdge) continue;
+          if (!Number.isFinite(ev) || (!options.includeNonPositive && (ev <= 1e-9 || ev + 1e-9 < context.minEdge))) continue;
           const id = [eventId, group.marketKey, group.player, group.line, side].map(value => encodeURIComponent(String(value))).join('|');
           const existing = best.get(id);
           // The per-side record is the best independently assessed offer, not
